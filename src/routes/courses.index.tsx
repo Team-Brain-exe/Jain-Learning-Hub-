@@ -4,7 +4,7 @@ import { Search, SlidersHorizontal, X } from "lucide-react";
 import { categories, courses, durationBuckets, filterCourses, type SortKey } from "@/data/courses";
 import { CourseCard } from "@/components/courses/CourseCard";
 
-type CatalogSearch = { q?: string; category?: string };
+type CatalogSearch = { q?: string | undefined; category?: string | undefined };
 
 export const Route = createFileRoute("/courses/")({
   validateSearch: (s: Record<string, unknown>): CatalogSearch => ({

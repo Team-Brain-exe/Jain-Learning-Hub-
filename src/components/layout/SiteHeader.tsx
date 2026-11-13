@@ -100,7 +100,7 @@ export function SiteHeader() {
               <Link
                 key={l.label}
                 to={l.to}
-                hash={"hash" in l ? l.hash : undefined}
+                {..."hash" in l ? { hash: l.hash } : {}}
                 onClick={() => setOpen(false)}
                 className="rounded-md px-3 py-3 text-[15px] font-medium text-foreground transition hover:bg-accent hover:text-primary"
                 activeProps={{ className: "text-primary" }}
