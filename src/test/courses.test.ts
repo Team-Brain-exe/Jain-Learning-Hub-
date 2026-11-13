@@ -13,3 +13,15 @@ describe("course catalog", () => {
     expect(filterCourses(courses, { sort: "name" })[0]?.title).toBe("Data Structures and Algorithms");
   });
 });
+
+import { courseProgress, getCourse, resumeLessonId } from "@/data/courses";
+describe("progress", () => {
+  const py = getCourse("python-programming-fundamentals")!;
+  it("counts completed lessons as a percentage", () => {
+    expect(courseProgress(py, ["1-1", "1-2", "1-3"])).toEqual({ done: 3, total: 15, percent: 20 });
+  });
+  it("resumes at the last visited lesson, else first incomplete", () => {
+    expect(resumeLessonId(py, "3-2", [])).toBe("3-2");
+    expect(resumeLessonId(py, undefined, ["1-1"])).toBe("1-2");
+  });
+});

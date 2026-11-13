@@ -231,3 +231,44 @@ export function filterCourses(list: Course[], f: CourseFilters): Course[] {
     sort === "name" ? a.title.localeCompare(b.title) : sort === "recent" ? b.addedOn.localeCompare(a.addedOn) : b.learners - a.learners,
   );
 }
+
+export interface FlatLesson extends Lesson { id: string; moduleIndex: number; moduleTitle: string; index: number }
+
+export function flattenLessons(course: Course): FlatLesson[] {
+  const out: FlatLesson[] = [];
+  course.modules.forEach((m, mi) =>
+    m.lessons.forEach((l, li) => out.push({ ...l, id: `${mi + 1}-${li + 1}`, moduleIndex: mi, moduleTitle: m.title, index: out.length })),
+  );
+  return out;
+}
+
+export function courseProgress(course: Course, completed: string[] = []) {
+  const all = flattenLessons(course);
+  const done = all.filter((l) => completed.includes(l.id)).length;
+  return { done, total: all.length, percent: all.length ? Math.round((done / all.length) * 100) : 0 };
+}
+
+/** Lesson to resume: last visited, else first incomplete, else first. */
+export function resumeLessonId(course: Course, last?: string, completed: string[] = []) {
+  const all = flattenLessons(course);
+  if (last && all.some((l) => l.id === last)) return last;
+  return (all.find((l) => !completed.includes(l.id)) ?? all[0])!.id;
+}
+
+export function lessonContent(course: Course, lesson: FlatLesson) {
+  return {
+    description: `In this lesson from "${lesson.moduleTitle}", ${course.instructor.name} walks through ${lesson.title.toLowerCase().replace(/\.$/, "")} with worked examples tied to ${course.title}. Watch the video, review the resources and mark the lesson complete when you are ready to move on.`,
+    resources: [
+      { title: `${lesson.title} — lecture slides`, kind: "PDF", meta: "Sample resource" },
+      { title: `Practice worksheet: ${lesson.title}`, kind: "Worksheet", meta: "Sample resource" },
+      { title: `Further reading on ${course.category}`, kind: "Reading", meta: "Sample resource" },
+    ],
+    transcript: [
+      ["00:00", `Welcome back. In this lesson we'll focus on ${lesson.title.toLowerCase()}.`],
+      ["00:42", `First, let's connect this to what we covered earlier in ${lesson.moduleTitle}.`],
+      ["02:15", "Now let's work through an example together, step by step."],
+      ["05:30", "Pause here and try the practice exercise from the resources tab."],
+      [`${String(Math.max(lesson.minutes - 1, 1)).padStart(2, "0")}:00`, "That wraps up this lesson. Mark it complete and continue to the next one."],
+    ] as [string, string][],
+  };
+}
