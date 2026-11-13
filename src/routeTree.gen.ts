@@ -11,12 +11,23 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as BecomeACreatorRouteImport } from './routes/become-a-creator'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MyLearningRouteImport } from './routes/my-learning'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as CertificatesIndexRouteImport } from './routes/certificates.index'
+import { Route as CertificatesCertIdRouteImport } from './routes/certificates.$certId'
 import { Route as CoursesIndexRouteImport } from './routes/courses.index'
 import { Route as CoursesSlugRouteImport } from './routes/courses.$slug'
+import { Route as CreatorIndexRouteImport } from './routes/creator.index'
+import { Route as CreatorIdRouteImport } from './routes/creator.$id'
+import { Route as FacultyIndexRouteImport } from './routes/faculty.index'
+import { Route as VerifyIndexRouteImport } from './routes/verify.index'
+import { Route as VerifyCertificateIdRouteImport } from './routes/verify.$certificateId'
+import { Route as FacultyReviewIdRouteImport } from './routes/faculty.review.$id'
 import { Route as LearnSlugLessonIdRouteImport } from './routes/learn.$slug.$lessonId'
+import { Route as LearnSlugQuizRouteImport } from './routes/learn.$slug.quiz'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -26,6 +37,11 @@ const IndexRoute = IndexRouteImport.update({
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BecomeACreatorRoute = BecomeACreatorRouteImport.update({
@@ -43,6 +59,21 @@ const MyLearningRoute = MyLearningRouteImport.update({
   path: '/my-learning',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CertificatesIndexRoute = CertificatesIndexRouteImport.update({
+  id: '/certificates/',
+  path: '/certificates/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CertificatesCertIdRoute = CertificatesCertIdRouteImport.update({
+  id: '/certificates/$certId',
+  path: '/certificates/$certId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CoursesIndexRoute = CoursesIndexRouteImport.update({
   id: '/courses/',
   path: '/courses/',
@@ -53,85 +84,197 @@ const CoursesSlugRoute = CoursesSlugRouteImport.update({
   path: '/courses/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CreatorIndexRoute = CreatorIndexRouteImport.update({
+  id: '/creator/',
+  path: '/creator/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreatorIdRoute = CreatorIdRouteImport.update({
+  id: '/creator/$id',
+  path: '/creator/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FacultyIndexRoute = FacultyIndexRouteImport.update({
+  id: '/faculty/',
+  path: '/faculty/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VerifyIndexRoute = VerifyIndexRouteImport.update({
+  id: '/verify/',
+  path: '/verify/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VerifyCertificateIdRoute = VerifyCertificateIdRouteImport.update({
+  id: '/verify/$certificateId',
+  path: '/verify/$certificateId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FacultyReviewIdRoute = FacultyReviewIdRouteImport.update({
+  id: '/faculty/review/$id',
+  path: '/faculty/review/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LearnSlugLessonIdRoute = LearnSlugLessonIdRouteImport.update({
   id: '/learn/$slug/$lessonId',
   path: '/learn/$slug/$lessonId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LearnSlugQuizRoute = LearnSlugQuizRouteImport.update({
+  id: '/learn/$slug/quiz',
+  path: '/learn/$slug/quiz',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/admin': typeof AdminRoute
   '/become-a-creator': typeof BecomeACreatorRoute
   '/login': typeof LoginRoute
   '/my-learning': typeof MyLearningRoute
+  '/profile': typeof ProfileRoute
+  '/certificates/$certId': typeof CertificatesCertIdRoute
   '/courses/$slug': typeof CoursesSlugRoute
+  '/creator/$id': typeof CreatorIdRoute
+  '/verify/$certificateId': typeof VerifyCertificateIdRoute
+  '/certificates/': typeof CertificatesIndexRoute
   '/courses/': typeof CoursesIndexRoute
+  '/creator/': typeof CreatorIndexRoute
+  '/faculty/': typeof FacultyIndexRoute
+  '/verify/': typeof VerifyIndexRoute
+  '/faculty/review/$id': typeof FacultyReviewIdRoute
   '/learn/$slug/$lessonId': typeof LearnSlugLessonIdRoute
+  '/learn/$slug/quiz': typeof LearnSlugQuizRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/admin': typeof AdminRoute
   '/become-a-creator': typeof BecomeACreatorRoute
   '/login': typeof LoginRoute
   '/my-learning': typeof MyLearningRoute
+  '/profile': typeof ProfileRoute
+  '/certificates/$certId': typeof CertificatesCertIdRoute
   '/courses/$slug': typeof CoursesSlugRoute
+  '/creator/$id': typeof CreatorIdRoute
+  '/verify/$certificateId': typeof VerifyCertificateIdRoute
+  '/certificates': typeof CertificatesIndexRoute
   '/courses': typeof CoursesIndexRoute
+  '/creator': typeof CreatorIndexRoute
+  '/faculty': typeof FacultyIndexRoute
+  '/verify': typeof VerifyIndexRoute
+  '/faculty/review/$id': typeof FacultyReviewIdRoute
   '/learn/$slug/$lessonId': typeof LearnSlugLessonIdRoute
+  '/learn/$slug/quiz': typeof LearnSlugQuizRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/admin': typeof AdminRoute
   '/become-a-creator': typeof BecomeACreatorRoute
   '/login': typeof LoginRoute
   '/my-learning': typeof MyLearningRoute
+  '/profile': typeof ProfileRoute
+  '/certificates/$certId': typeof CertificatesCertIdRoute
   '/courses/$slug': typeof CoursesSlugRoute
+  '/creator/$id': typeof CreatorIdRoute
+  '/verify/$certificateId': typeof VerifyCertificateIdRoute
+  '/certificates/': typeof CertificatesIndexRoute
   '/courses/': typeof CoursesIndexRoute
+  '/creator/': typeof CreatorIndexRoute
+  '/faculty/': typeof FacultyIndexRoute
+  '/verify/': typeof VerifyIndexRoute
+  '/faculty/review/$id': typeof FacultyReviewIdRoute
   '/learn/$slug/$lessonId': typeof LearnSlugLessonIdRoute
+  '/learn/$slug/quiz': typeof LearnSlugQuizRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/about'
+    | '/admin'
     | '/become-a-creator'
     | '/login'
     | '/my-learning'
+    | '/profile'
+    | '/certificates/$certId'
     | '/courses/$slug'
+    | '/creator/$id'
+    | '/verify/$certificateId'
+    | '/certificates/'
     | '/courses/'
+    | '/creator/'
+    | '/faculty/'
+    | '/verify/'
+    | '/faculty/review/$id'
     | '/learn/$slug/$lessonId'
+    | '/learn/$slug/quiz'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/about'
+    | '/admin'
     | '/become-a-creator'
     | '/login'
     | '/my-learning'
+    | '/profile'
+    | '/certificates/$certId'
     | '/courses/$slug'
+    | '/creator/$id'
+    | '/verify/$certificateId'
+    | '/certificates'
     | '/courses'
+    | '/creator'
+    | '/faculty'
+    | '/verify'
+    | '/faculty/review/$id'
     | '/learn/$slug/$lessonId'
+    | '/learn/$slug/quiz'
   id:
     | '__root__'
     | '/'
     | '/about'
+    | '/admin'
     | '/become-a-creator'
     | '/login'
     | '/my-learning'
+    | '/profile'
+    | '/certificates/$certId'
     | '/courses/$slug'
+    | '/creator/$id'
+    | '/verify/$certificateId'
+    | '/certificates/'
     | '/courses/'
+    | '/creator/'
+    | '/faculty/'
+    | '/verify/'
+    | '/faculty/review/$id'
     | '/learn/$slug/$lessonId'
+    | '/learn/$slug/quiz'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  AdminRoute: typeof AdminRoute
   BecomeACreatorRoute: typeof BecomeACreatorRoute
   LoginRoute: typeof LoginRoute
   MyLearningRoute: typeof MyLearningRoute
+  ProfileRoute: typeof ProfileRoute
+  CertificatesCertIdRoute: typeof CertificatesCertIdRoute
   CoursesSlugRoute: typeof CoursesSlugRoute
+  CreatorIdRoute: typeof CreatorIdRoute
+  VerifyCertificateIdRoute: typeof VerifyCertificateIdRoute
+  CertificatesIndexRoute: typeof CertificatesIndexRoute
   CoursesIndexRoute: typeof CoursesIndexRoute
+  CreatorIndexRoute: typeof CreatorIndexRoute
+  FacultyIndexRoute: typeof FacultyIndexRoute
+  VerifyIndexRoute: typeof VerifyIndexRoute
+  FacultyReviewIdRoute: typeof FacultyReviewIdRoute
   LearnSlugLessonIdRoute: typeof LearnSlugLessonIdRoute
+  LearnSlugQuizRoute: typeof LearnSlugQuizRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -148,6 +291,13 @@ declare module '@tanstack/react-router' {
       path: '/about'
       fullPath: '/about'
       preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/become-a-creator': {
@@ -171,6 +321,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MyLearningRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/certificates/': {
+      id: '/certificates/'
+      path: '/certificates'
+      fullPath: '/certificates/'
+      preLoaderRoute: typeof CertificatesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/certificates/$certId': {
+      id: '/certificates/$certId'
+      path: '/certificates/$certId'
+      fullPath: '/certificates/$certId'
+      preLoaderRoute: typeof CertificatesCertIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/courses/': {
       id: '/courses/'
       path: '/courses'
@@ -185,11 +356,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CoursesSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/creator/': {
+      id: '/creator/'
+      path: '/creator'
+      fullPath: '/creator/'
+      preLoaderRoute: typeof CreatorIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/creator/$id': {
+      id: '/creator/$id'
+      path: '/creator/$id'
+      fullPath: '/creator/$id'
+      preLoaderRoute: typeof CreatorIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/faculty/': {
+      id: '/faculty/'
+      path: '/faculty'
+      fullPath: '/faculty/'
+      preLoaderRoute: typeof FacultyIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verify/': {
+      id: '/verify/'
+      path: '/verify'
+      fullPath: '/verify/'
+      preLoaderRoute: typeof VerifyIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verify/$certificateId': {
+      id: '/verify/$certificateId'
+      path: '/verify/$certificateId'
+      fullPath: '/verify/$certificateId'
+      preLoaderRoute: typeof VerifyCertificateIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/faculty/review/$id': {
+      id: '/faculty/review/$id'
+      path: '/faculty/review/$id'
+      fullPath: '/faculty/review/$id'
+      preLoaderRoute: typeof FacultyReviewIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/learn/$slug/$lessonId': {
       id: '/learn/$slug/$lessonId'
       path: '/learn/$slug/$lessonId'
       fullPath: '/learn/$slug/$lessonId'
       preLoaderRoute: typeof LearnSlugLessonIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/learn/$slug/quiz': {
+      id: '/learn/$slug/quiz'
+      path: '/learn/$slug/quiz'
+      fullPath: '/learn/$slug/quiz'
+      preLoaderRoute: typeof LearnSlugQuizRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -198,12 +418,23 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  AdminRoute: AdminRoute,
   BecomeACreatorRoute: BecomeACreatorRoute,
   LoginRoute: LoginRoute,
   MyLearningRoute: MyLearningRoute,
+  ProfileRoute: ProfileRoute,
+  CertificatesCertIdRoute: CertificatesCertIdRoute,
   CoursesSlugRoute: CoursesSlugRoute,
+  CreatorIdRoute: CreatorIdRoute,
+  VerifyCertificateIdRoute: VerifyCertificateIdRoute,
+  CertificatesIndexRoute: CertificatesIndexRoute,
   CoursesIndexRoute: CoursesIndexRoute,
+  CreatorIndexRoute: CreatorIndexRoute,
+  FacultyIndexRoute: FacultyIndexRoute,
+  VerifyIndexRoute: VerifyIndexRoute,
+  FacultyReviewIdRoute: FacultyReviewIdRoute,
   LearnSlugLessonIdRoute: LearnSlugLessonIdRoute,
+  LearnSlugQuizRoute: LearnSlugQuizRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

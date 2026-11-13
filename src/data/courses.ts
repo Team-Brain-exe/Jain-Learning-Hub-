@@ -8,7 +8,18 @@ import git from "@/assets/course-git.jpg";
 export type Level = "Beginner" | "Intermediate" | "Advanced";
 export type CourseType = "Faculty Course" | "Student Creator";
 
-export interface Lesson { title: string; minutes: number }
+export interface LessonResource { title: string; url: string }
+export interface Lesson {
+  title: string;
+  minutes: number;
+  /** Optional real content (set for creator-published courses). */
+  kind?: "video" | "reading" | "quiz" | undefined;
+  description?: string | undefined;
+  videoUrl?: string | undefined;
+  captionsUrl?: string | undefined;
+  resources?: LessonResource[] | undefined;
+  transcript?: string | undefined;
+}
 export interface Module { title: string; lessons: Lesson[] }
 export interface Course {
   slug: string;
@@ -256,12 +267,23 @@ export function resumeLessonId(course: Course, last?: string, completed: string[
 }
 
 export function lessonContent(course: Course, lesson: FlatLesson) {
+  if (lesson.description || lesson.videoUrl || lesson.resources?.length || lesson.transcript) {
+    return {
+      description: lesson.description || `Lesson from "${lesson.moduleTitle}" in ${course.title}.`,
+      resources: (lesson.resources ?? []).map((r) => ({ title: r.title, kind: "Link", meta: r.url, url: r.url })),
+      transcript: (lesson.transcript ?? "")
+        .split("\n").map((l) => l.trim()).filter(Boolean)
+        .map((l) => { const m = l.match(/^\[?(\d{1,2}:\d{2})\]?\s*(.*)$/); return (m ? [m[1], m[2]] : ["", l]) as [string, string]; }),
+      real: true as const,
+    };
+  }
   return {
+    real: false as const,
     description: `In this lesson from "${lesson.moduleTitle}", ${course.instructor.name} walks through ${lesson.title.toLowerCase().replace(/\.$/, "")} with worked examples tied to ${course.title}. Watch the video, review the resources and mark the lesson complete when you are ready to move on.`,
     resources: [
-      { title: `${lesson.title} — lecture slides`, kind: "PDF", meta: "Sample resource" },
-      { title: `Practice worksheet: ${lesson.title}`, kind: "Worksheet", meta: "Sample resource" },
-      { title: `Further reading on ${course.category}`, kind: "Reading", meta: "Sample resource" },
+      { title: `${lesson.title} — lecture slides`, kind: "PDF", meta: "Sample resource", url: "" },
+      { title: `Practice worksheet: ${lesson.title}`, kind: "Worksheet", meta: "Sample resource", url: "" },
+      { title: `Further reading on ${course.category}`, kind: "Reading", meta: "Sample resource", url: "" },
     ],
     transcript: [
       ["00:00", `Welcome back. In this lesson we'll focus on ${lesson.title.toLowerCase()}.`],

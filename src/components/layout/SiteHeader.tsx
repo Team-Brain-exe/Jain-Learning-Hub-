@@ -1,5 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Bell, ChevronDown, CircleHelp, Menu, Search, User } from "lucide-react";
+import { useAuth, signOut } from "@/hooks/use-auth";
+import { markAllRead, usePlatform } from "@/data/platform";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
@@ -34,6 +36,13 @@ export function SearchBox({ size = "md", initial = "" }: { size?: "md" | "lg"; i
   );
 }
 
+const roleLinks = {
+  creator: [{ to: "/creator", label: "Creator Studio" }],
+  reviewer: [{ to: "/faculty", label: "Review Queue" }],
+  admin: [{ to: "/admin", label: "Admin" }, { to: "/faculty", label: "Review Queue" }],
+  learner: [],
+} as const;
+
 const drawerLinks = [
   { to: "/", label: "Home" },
   { to: "/courses", label: "Explore Courses" },
@@ -46,6 +55,10 @@ const drawerLinks = [
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const { user } = useAuth();
+  const notes = usePlatform().notifications.filter((n) => n.userId === user?.id);
+  const unread = notes.filter((n) => !n.read).length;
+  const extra = user ? roleLinks[user.role] : [];
   const iconBtn = "grid h-10 w-10 place-items-center rounded-full text-foreground/80 transition hover:bg-accent hover:text-primary";
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-card">
@@ -75,18 +88,45 @@ export function SiteHeader() {
           <Link to="/courses" aria-label="Search" className={`${iconBtn} lg:hidden`}><Search className="h-5 w-5" /></Link>
           <Link to="/about" hash="help" aria-label="Help" className={`${iconBtn} hidden sm:grid`}><CircleHelp className="h-5 w-5" /></Link>
           <Popover>
-            <PopoverTrigger aria-label="Notifications" className={iconBtn}><Bell className="h-5 w-5" /></PopoverTrigger>
-            <PopoverContent align="end" className="w-72">
-              <p className="text-sm font-semibold">Notifications</p>
-              <p className="mt-2 text-sm text-muted-foreground">Welcome to JAIN FET Learning Hub! New faculty-reviewed courses are added every month.</p>
+            <PopoverTrigger aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`} className={`${iconBtn} relative`}>
+              <Bell className="h-5 w-5" />
+              {unread > 0 && <span className="absolute right-1.5 top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">{unread}</span>}
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-80">
+              <div className="flex items-center justify-between"><p className="text-sm font-semibold">Notifications</p>{unread > 0 && user && <button className="text-xs font-semibold text-primary" onClick={() => markAllRead(user.id)}>Mark all read</button>}</div>
+              {!user && <p className="mt-2 text-sm text-muted-foreground">Sign in to see your notifications.</p>}
+              <ul className="mt-2 max-h-72 space-y-2 overflow-y-auto">
+                {notes.slice(0, 15).map((n) => (
+                  <li key={n.id} className={`rounded-md p-2 text-sm ${n.read ? "text-muted-foreground" : "bg-secondary font-medium"}`}>
+                    {n.href ? <Link to={n.href} className="block">{n.text}</Link> : n.text}
+                  </li>
+                ))}
+                {user && !notes.length && <li className="text-sm text-muted-foreground">You're all caught up.</li>}
+              </ul>
             </PopoverContent>
           </Popover>
           <DropdownMenu>
             <DropdownMenuTrigger aria-label="Account" className="ml-1 grid h-9 w-9 place-items-center rounded-full bg-navy text-navy-foreground"><User className="h-4 w-4" /></DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem asChild><Link to="/login" className="cursor-pointer">Sign in</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link to="/my-learning" className="cursor-pointer">My Learning</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link to="/become-a-creator" className="cursor-pointer">Become a Creator</Link></DropdownMenuItem>
+            <DropdownMenuContent align="end" className="w-56">
+              {user ? (
+                <>
+                  <DropdownMenuLabel>{user.name}<span className="block text-xs font-normal capitalize text-muted-foreground">{user.role}</span></DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {extra.map((l) => <DropdownMenuItem key={l.to} asChild><Link to={l.to} className="cursor-pointer font-semibold text-primary">{l.label}</Link></DropdownMenuItem>)}
+                  <DropdownMenuItem asChild><Link to="/my-learning" className="cursor-pointer">My Learning</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to="/certificates" className="cursor-pointer">Certificates</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to="/profile" className="cursor-pointer">Profile</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to="/login" className="cursor-pointer">Switch demo account</Link></DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => signOut()} className="cursor-pointer">Sign out</DropdownMenuItem>
+                </>
+              ) : (
+                <>
+                  <DropdownMenuItem asChild><Link to="/login" className="cursor-pointer">Sign in</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to="/my-learning" className="cursor-pointer">My Learning</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to="/become-a-creator" className="cursor-pointer">Become a Creator</Link></DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -96,10 +136,10 @@ export function SiteHeader() {
           <SheetHeader><SheetTitle asChild><div><Brand /></div></SheetTitle></SheetHeader>
           <div className="mt-4 px-4 md:hidden"><SearchBox /></div>
           <nav className="mt-4 flex flex-col px-2">
-            {drawerLinks.map((l) => (
+            {[...drawerLinks.filter((l) => !(user && l.to === "/login")), ...extra.map((l) => ({ ...l, to: l.to as string })), ...(user ? [{ to: "/certificates", label: "Certificates" }] : [])].map((l) => (
               <Link
                 key={l.label}
-                to={l.to}
+                to={l.to as "/"}
                 {..."hash" in l ? { hash: l.hash } : {}}
                 onClick={() => setOpen(false)}
                 className="rounded-md px-3 py-3 text-[15px] font-medium text-foreground transition hover:bg-accent hover:text-primary"

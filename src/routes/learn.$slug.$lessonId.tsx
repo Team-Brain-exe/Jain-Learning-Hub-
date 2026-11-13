@@ -2,18 +2,20 @@ import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-ro
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Circle, FileText, Maximize, PanelLeftClose, PanelLeftOpen, Play, Settings, Volume2, X } from "lucide-react";
 import { toast } from "sonner";
-import { courseProgress, flattenLessons, getCourse, lessonContent } from "@/data/courses";
+import { courseProgress, flattenLessons, lessonContent, type Course, type FlatLesson } from "@/data/courses";
+import { allCourses, findCourse, getQuiz, usePlatform } from "@/data/platform";
+import { LessonVideo } from "@/components/courses/LessonVideo";
 import { setLessonComplete, useLearner, visitLesson } from "@/hooks/use-enrollment";
 
 export const Route = createFileRoute("/learn/$slug/$lessonId")({
   loader: ({ params }) => {
-    const course = getCourse(params.slug);
+    const course = findCourse(params.slug);
     const lesson = course && flattenLessons(course).find((l) => l.id === params.lessonId);
-    if (!course || !lesson) throw notFound();
-    return { course, lesson };
+    if (!course || !lesson) { if (typeof window === "undefined") return { course: null as Course | null, lesson: null as FlatLesson | null }; throw notFound(); }
+    return { course: course as Course | null, lesson: lesson as FlatLesson | null };
   },
   head: ({ loaderData }) => ({
-    meta: loaderData
+    meta: loaderData?.course && loaderData.lesson
       ? [
           { title: `${loaderData.lesson.title} · ${loaderData.course.title} — JAIN FET Learning Hub` },
           { name: "description", content: `Lesson: ${loaderData.lesson.title} in ${loaderData.course.title}.` },
@@ -67,7 +69,22 @@ function VideoPlaceholder({ title, minutes }: { title: string; minutes: number }
 }
 
 function LessonPage() {
-  const { course, lesson } = Route.useLoaderData();
+  const data = Route.useLoaderData();
+  const { slug, lessonId } = Route.useParams();
+  const state = usePlatform();
+  const course = data.course ?? allCourses(state).find((c) => c.slug === slug);
+  const lesson = data.lesson ?? (course ? flattenLessons(course).find((l) => l.id === lessonId) : undefined);
+  if (!course || !lesson) return (
+    <div className="mx-auto max-w-xl px-4 py-24 text-center">
+      <h1 className="text-2xl font-bold">Lesson not found</h1>
+      <Link to="/my-learning" className="mt-4 inline-block font-semibold text-primary">Back to My Learning</Link>
+    </div>
+  );
+  return <LessonView course={course} lesson={lesson} />;
+}
+
+function LessonView({ course, lesson }: { course: Course; lesson: FlatLesson }) {
+  const hasQuiz = !!getQuiz(course.slug, usePlatform());
   const navigate = useNavigate();
   const state = useLearner();
   const completed = state.completed[course.slug] ?? [];
@@ -104,6 +121,7 @@ function LessonPage() {
           <span className="text-sm font-semibold">{progress.percent}%</span>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">{progress.done} of {progress.total} lessons complete</p>
+        {hasQuiz && <Link to="/learn/$slug/quiz" params={{ slug: course.slug }} className="mt-3 inline-flex h-8 items-center rounded-md border border-primary px-3 text-xs font-semibold text-primary hover:bg-accent">Take final assessment</Link>}
       </div>
       <div className="flex-1 overflow-y-auto">
         {course.modules.map((m, mi) => {
@@ -185,7 +203,7 @@ function LessonPage() {
             <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">{lesson.title}</h1>
             <p className="mt-1 text-sm text-muted-foreground">Module {lesson.moduleIndex + 1}: {lesson.moduleTitle} · Video · {lesson.minutes} min</p>
 
-            <div className="mt-5"><VideoPlaceholder title={lesson.title} minutes={lesson.minutes} /></div>
+            <div className="mt-5">{lesson.videoUrl ? <LessonVideo url={lesson.videoUrl} captionsUrl={lesson.captionsUrl} title={lesson.title} /> : <VideoPlaceholder title={lesson.title} minutes={lesson.minutes} />}</div>
 
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <button disabled={!prev} onClick={() => prev && go(prev.id)} className="inline-flex h-10 items-center gap-1 rounded-md border border-border bg-card px-4 text-sm font-semibold disabled:opacity-40">
@@ -214,22 +232,29 @@ function LessonPage() {
                 {tab === "overview" && <p className="leading-relaxed text-foreground/85">{content.description}</p>}
                 {tab === "resources" && (
                   <ul className="space-y-3">
+                    {content.resources.length === 0 && <li className="text-sm text-muted-foreground">No resources attached to this lesson.</li>}
                     {content.resources.map((r) => (
                       <li key={r.title}>
-                        <button onClick={() => toast.info("Sample resource", { description: "Downloadable materials will be added when the course is published." })} className="flex w-full items-center gap-3 rounded-lg border border-border p-4 text-left transition hover:border-primary">
+                        {r.url ? (
+                          <a href={r.url} target="_blank" rel="noreferrer noopener" className="flex w-full items-center gap-3 rounded-lg border border-border p-4 text-left transition hover:border-primary">
+                            <span className="grid h-10 w-10 place-items-center rounded-md bg-secondary text-primary"><FileText className="h-5 w-5" /></span>
+                            <span className="flex-1"><span className="block text-sm font-semibold">{r.title}</span><span className="break-all text-xs text-muted-foreground">{r.kind} · opens in a new tab</span></span>
+                          </a>
+                        ) : <button onClick={() => toast.info("Sample resource", { description: "Downloadable materials will be added when the course is published." })} className="flex w-full items-center gap-3 rounded-lg border border-border p-4 text-left transition hover:border-primary">
                           <span className="grid h-10 w-10 place-items-center rounded-md bg-secondary text-primary"><FileText className="h-5 w-5" /></span>
                           <span className="flex-1"><span className="block text-sm font-semibold">{r.title}</span><span className="text-xs text-muted-foreground">{r.kind} · {r.meta}</span></span>
-                        </button>
+                        </button>}
                       </li>
                     ))}
                   </ul>
                 )}
                 {tab === "transcript" && (
                   <div>
-                    <p className="mb-4 rounded-md bg-secondary px-3 py-2 text-xs font-semibold text-navy">Sample transcript — the real transcript will be generated from the lesson video.</p>
+                    {!content.real && <p className="mb-4 rounded-md bg-secondary px-3 py-2 text-xs font-semibold text-navy">Sample transcript — the real transcript will be added by the course creator.</p>}
+                    {content.real && content.transcript.length === 0 && <p className="text-sm text-muted-foreground">No transcript provided for this lesson.</p>}
                     <ul className="space-y-3">
                       {content.transcript.map(([t, line]) => (
-                        <li key={t} className="flex gap-4 text-sm"><span className="w-12 shrink-0 font-mono text-primary">{t}</span><span className="text-foreground/85">{line}</span></li>
+                        <li key={t + line} className="flex gap-4 text-sm"><span className="w-12 shrink-0 font-mono text-primary">{t}</span><span className="text-foreground/85">{line}</span></li>
                       ))}
                     </ul>
                   </div>

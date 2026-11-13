@@ -3,7 +3,7 @@ import { Clock, Star, Users } from "lucide-react";
 import type { Course } from "@/data/courses";
 
 export function LevelBadge({ level }: { level: string }) {
-  return <span className="rounded-md bg-secondary px-2 py-0.5 text-xs font-semibold text-secondary-foreground">{level}</span>;
+  return <span className="text-xs font-semibold tracking-wide text-muted-foreground">{level}</span>;
 }
 
 export function CourseCard({ course }: { course: Course }) {
@@ -27,7 +27,7 @@ export function CourseCard({ course }: { course: Course }) {
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground">
           <LevelBadge level={course.level} />
           <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{course.weeks} weeks</span>
-          <span className="flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-warning text-warning" />{course.rating}</span>
+          <span className="flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-warning text-warning" />{course.rating || "New"}</span>
           <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{course.learners.toLocaleString()}</span>
         </div>
         <span className="mt-5 inline-flex h-10 items-center justify-center rounded-md border border-primary text-sm font-semibold text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">

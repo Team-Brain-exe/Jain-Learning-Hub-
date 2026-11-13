@@ -45,7 +45,7 @@ function Home() {
       <section className="border-b border-border bg-card">
         <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 py-16 sm:px-6 md:py-24 lg:grid-cols-[1.2fr_1fr]">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-3 py-1.5 text-xs font-semibold text-navy">
+            <div className="inline-flex items-center gap-3 text-sm font-semibold text-navy">
               <JgiLogo className="h-5 w-5" /> JAIN (Deemed-to-be University) · Faculty of Engineering and Technology
             </div>
             <h1 className="mt-6 text-4xl font-extrabold leading-[1.1] tracking-tight text-foreground sm:text-5xl lg:text-6xl">

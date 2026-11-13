@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { BookOpen, CheckCircle2, Clock, PlayCircle, Trophy } from "lucide-react";
-import { courseProgress, courses, flattenLessons, resumeLessonId, type Course } from "@/data/courses";
+import { courseProgress, flattenLessons, resumeLessonId, type Course } from "@/data/courses";
 import { useLearner } from "@/hooks/use-enrollment";
+import { useAllCourses } from "@/data/platform";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/my-learning")({
   head: () => ({
@@ -23,6 +25,8 @@ function Bar({ percent }: { percent: number }) {
 
 function MyLearning() {
   const s = useLearner();
+  const courses = useAllCourses();
+  const { user } = useAuth();
   const enrolled = courses.filter((c) => s.enrolled.includes(c.slug));
   const withP = enrolled.map((c) => ({ c, p: courseProgress(c, s.completed[c.slug]), resume: resumeLessonId(c, s.last[c.slug], s.completed[c.slug]) }));
   const inProgress = withP.filter((x) => x.p.percent < 100);
@@ -37,8 +41,8 @@ function MyLearning() {
       <section className="border-b border-border bg-card">
         <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
           <p className="text-sm font-semibold text-primary">My Learning</p>
-          <h1 className="mt-1 text-3xl font-extrabold tracking-tight">Welcome back, learner</h1>
-          <p className="mt-2 text-muted-foreground">Pick up where you left off. Progress is a demo saved on this device.</p>
+          <h1 className="mt-1 text-3xl font-extrabold tracking-tight">Welcome back, {user ? user.name.split(" ")[0] : "learner"}</h1>
+          <p className="mt-2 text-muted-foreground">Pick up where you left off. Progress is a demo saved on this device. <Link to="/certificates" className="font-semibold text-primary">View certificates</Link></p>
           <div className="mt-6 grid grid-cols-3 gap-3 sm:max-w-lg">
             {[[BookOpen, enrolled.length, "Enrolled"], [Clock, lessonsDone, "Lessons done"], [Trophy, done.length, "Completed"]].map(([I, n, l]) => {
               const Icon = I as typeof BookOpen;

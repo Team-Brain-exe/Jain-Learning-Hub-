@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
-import { categories, courses, durationBuckets, filterCourses, type SortKey } from "@/data/courses";
+import { categories, durationBuckets, filterCourses, type SortKey } from "@/data/courses";
+import { useAllCourses } from "@/data/platform";
 import { CourseCard } from "@/components/courses/CourseCard";
 
 type CatalogSearch = { q?: string | undefined; category?: string | undefined };
@@ -58,7 +59,8 @@ function Catalog() {
   useEffect(() => { setQ(search.q ?? ""); }, [search.q]);
   useEffect(() => { setCats(search.category ? [search.category] : []); }, [search.category]);
 
-  const results = useMemo(() => filterCourses(courses, { q, categories: cats, levels, durations, types, sort }), [q, cats, levels, durations, types, sort]);
+  const courses = useAllCourses();
+  const results = useMemo(() => filterCourses(courses, { q, categories: cats, levels, durations, types, sort }), [courses, q, cats, levels, durations, types, sort]);
   const active = cats.length + levels.length + durations.length + types.length + (q ? 1 : 0);
 
   const clear = () => {

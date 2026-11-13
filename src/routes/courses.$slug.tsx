@@ -2,18 +2,20 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { CheckCircle2, ChevronDown, Clock, PlayCircle, Star, Users, BarChart, Layers } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { getCourse } from "@/data/courses";
+import { allCourses, findCourse, usePlatform } from "@/data/platform";
+import type { Course } from "@/data/courses";
 import { LevelBadge } from "@/components/courses/CourseCard";
 import { enroll, useEnrollments } from "@/hooks/use-enrollment";
 
 export const Route = createFileRoute("/courses/$slug")({
   loader: ({ params }) => {
-    const course = getCourse(params.slug);
-    if (!course) throw notFound();
-    return { course };
+    const course = findCourse(params.slug);
+    // Creator-published courses live in browser storage, so on the server they resolve client-side.
+    if (!course) { if (typeof window === "undefined") return { course: null as Course | null }; throw notFound(); }
+    return { course: course as Course | null };
   },
   head: ({ loaderData }) => ({
-    meta: loaderData
+    meta: loaderData?.course
       ? [
           { title: `${loaderData.course.title} — JAIN FET Learning Hub` },
           { name: "description", content: loaderData.course.description },
@@ -34,7 +36,20 @@ export const Route = createFileRoute("/courses/$slug")({
 });
 
 function CourseDetail() {
-  const { course } = Route.useLoaderData();
+  const { course: loaded } = Route.useLoaderData();
+  const { slug } = Route.useParams();
+  const state = usePlatform();
+  const course = loaded ?? allCourses(state).find((c) => c.slug === slug);
+  if (!course) return (
+    <div className="mx-auto max-w-xl px-4 py-24 text-center">
+      <h1 className="text-2xl font-bold">Course not found</h1>
+      <Link to="/courses" className="mt-4 inline-block font-semibold text-primary">Browse all courses</Link>
+    </div>
+  );
+  return <CourseView course={course} />;
+}
+
+function CourseView({ course }: { course: Course }) {
   const enrolled = useEnrollments().includes(course.slug);
   const [open, setOpen] = useState<number[]>([0]);
   const total = course.modules.reduce((n, m) => n + m.lessons.length, 0);
@@ -87,7 +102,7 @@ function CourseDetail() {
             [Layers, `${course.modules.length} modules`, `${total} lessons`],
             [BarChart, `${course.level} level`, course.category],
             [Clock, `${course.weeks} weeks`, "Learn at your own pace"],
-            [Star, `${course.rating} rating`, course.type],
+            [Star, course.rating ? `${course.rating} rating` : "New course", course.type],
           ].map(([Icon, t, s]) => {
             const I = Icon as typeof Star;
             return (

@@ -23,6 +23,7 @@ export function SiteFooter() {
           <Link to="/courses" className={`block ${a}`}>Explore Courses</Link>
           <Link to="/my-learning" className={`block ${a}`}>My Learning</Link>
           <Link to="/become-a-creator" className={`block ${a}`}>Become a Creator</Link>
+          <Link to="/verify" className={`block ${a}`}>Verify a certificate</Link>
           <Link to="/about" className={`block ${a}`}>About</Link>
           <Link to="/about" hash="help" className={`block ${a}`}>Help</Link>
         </div>
