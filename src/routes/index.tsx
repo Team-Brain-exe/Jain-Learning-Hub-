@@ -63,7 +63,7 @@ function Home() {
           <div className="hidden rounded-2xl border border-border bg-background p-5 lg:block">
             <p className="text-sm font-semibold text-muted-foreground">Continue learning</p>
             <div className="mt-3 overflow-hidden rounded-xl border border-border bg-card">
-              <img src={courses[0].thumbnail} alt="" width={1024} height={640} className="aspect-[16/9] w-full object-cover" />
+              <img src={courses[0]!.thumbnail} alt="" width={1024} height={640} className="aspect-[16/9] w-full object-cover" />
               <div className="p-5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-primary">Course 1/5 · Programming</p>
                 <p className="mt-1 text-lg font-bold">Python Programming Fundamentals</p>

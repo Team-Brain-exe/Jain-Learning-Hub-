@@ -8,8 +8,8 @@ type CatalogSearch = { q?: string; category?: string };
 
 export const Route = createFileRoute("/courses/")({
   validateSearch: (s: Record<string, unknown>): CatalogSearch => ({
-    q: typeof s.q === "string" && s.q ? s.q : undefined,
-    category: typeof s.category === "string" && s.category ? s.category : undefined,
+    q: typeof s["q"] === "string" && s["q"] ? s["q"] : undefined,
+    category: typeof s["category"] === "string" && s["category"] ? s["category"] : undefined,
   }),
   head: () => ({
     meta: [

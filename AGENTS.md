@@ -28,3 +28,5 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+- Course data and filter/sort logic live in src/data/courses.ts; demo enrollment in src/hooks/use-enrollment.ts (localStorage) — why: one swap point for a future API.

@@ -10,6 +10,6 @@ describe("course catalog", () => {
     expect(r.map((c) => c.title).sort()).toEqual(["Git and GitHub for Beginners", "Python Programming Fundamentals"]);
   });
   it("sorts by name", () => {
-    expect(filterCourses(courses, { sort: "name" })[0].title).toBe("Data Structures and Algorithms");
+    expect(filterCourses(courses, { sort: "name" })[0]?.title).toBe("Data Structures and Algorithms");
   });
 });
