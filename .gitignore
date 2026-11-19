@@ -30,3 +30,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python backend ignores
+backend/venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.db
+
