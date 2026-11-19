@@ -8,7 +8,7 @@ from app.models.certificate import CertificateType
 @pytest.fixture(autouse=True)
 def seed_certificate_fixtures(db_session):
     # Faculty & approved permission
-    f1 = VerifiedFaculty(id="fac_cse", name="Dr. Rao", email="rao@jain.ac.in", department="CSE", is_active=True)
+    f1 = VerifiedFaculty(id="fac_cse", name="Dr. Rao", email="rao.cse.test@example.com", department="CSE", is_active=True)
     db_session.add(f1)
     
     perm = UploadPermission(
@@ -72,9 +72,9 @@ def seed_certificate_fixtures(db_session):
 
 # ==================== COURSE COMPLETION CERTIFICATE TESTS ====================
 
-def test_course_completion_ineligible_without_passing_quiz_and_lessons(client):
+def test_course_completion_ineligible_without_passing_quiz_and_lessons(client, auth_headers):
     # Student enrolled but has 0% lesson progress and no quiz attempt -> 400 Bad Request
-    client.post("/api/courses/course_dist_sys/enroll", headers={"X-User-Id": "student_learner", "X-User-Role": "student"})
+    client.post("/api/courses/course_dist_sys/enroll", headers=auth_headers["student_learner"])
 
     req_payload = {
         "recipient_id": "student_learner",
@@ -82,22 +82,22 @@ def test_course_completion_ineligible_without_passing_quiz_and_lessons(client):
         "certificate_type": "COURSE_COMPLETION",
         "is_sample": True
     }
-    res = client.post("/api/admin/certificates/issue", json=req_payload, headers={"X-User-Id": "admin_user", "X-User-Role": "admin"})
+    res = client.post("/api/admin/certificates/issue", json=req_payload, headers=auth_headers["admin_user"])
     assert res.status_code == 400
     assert "Ineligible" in res.json()["detail"]
 
-def test_course_completion_eligible_and_public_verification(client):
+def test_course_completion_eligible_and_public_verification(client, auth_headers):
     # 1. Enroll learner
-    client.post("/api/courses/course_dist_sys/enroll", headers={"X-User-Id": "student_learner", "X-User-Role": "student"})
+    client.post("/api/courses/course_dist_sys/enroll", headers=auth_headers["student_learner"])
 
     # 2. Complete lesson
-    client.post("/api/lessons/les_ds_01/progress", json={"is_completed": True}, headers={"X-User-Id": "student_learner", "X-User-Role": "student"})
+    client.post("/api/lessons/les_ds_01/progress", json={"is_completed": True}, headers=auth_headers["student_learner"])
 
     # 3. Pass quiz (100% >= 75%)
     client.post(
         "/api/quizzes/quiz_ds_01/attempts",
         json={"answers": [{"question_id": "q_ds_01", "selected_option_index": 0}]},
-        headers={"X-User-Id": "student_learner", "X-User-Role": "student"}
+        headers=auth_headers["student_learner"]
     )
 
     # 4. Admin issues certificate -> 201 Created
@@ -107,7 +107,7 @@ def test_course_completion_eligible_and_public_verification(client):
         "certificate_type": "COURSE_COMPLETION",
         "is_sample": True
     }
-    issue_res = client.post("/api/admin/certificates/issue", json=req_payload, headers={"X-User-Id": "admin_user", "X-User-Role": "admin"})
+    issue_res = client.post("/api/admin/certificates/issue", json=req_payload, headers=auth_headers["admin_user"])
     assert issue_res.status_code == 201
     cert_data = issue_res.json()
     assert cert_data["recipient_id"] == "student_learner"
@@ -117,7 +117,7 @@ def test_course_completion_eligible_and_public_verification(client):
     code = cert_data["certificate_code"]
 
     # 5. Student views certificate in /api/certificates/me
-    me_res = client.get("/api/certificates/me", headers={"X-User-Id": "student_learner", "X-User-Role": "student"})
+    me_res = client.get("/api/certificates/me", headers=auth_headers["student_learner"])
     assert me_res.status_code == 200
     assert any(c["certificate_code"] == code for c in me_res.json())
 
@@ -132,7 +132,7 @@ def test_course_completion_eligible_and_public_verification(client):
 
 # ==================== PEER EDUCATOR CERTIFICATE TESTS ====================
 
-def test_peer_educator_ineligible_for_non_creator_or_unpublished(client):
+def test_peer_educator_ineligible_for_non_creator_or_unpublished(client, auth_headers):
     # Non-creator student attempts to claim peer educator certificate -> 400
     req_bad_creator = {
         "recipient_id": "impostor_student",
@@ -140,7 +140,7 @@ def test_peer_educator_ineligible_for_non_creator_or_unpublished(client):
         "certificate_type": "PEER_EDUCATOR",
         "is_sample": True
     }
-    res1 = client.post("/api/admin/certificates/issue", json=req_bad_creator, headers={"X-User-Id": "admin_user", "X-User-Role": "admin"})
+    res1 = client.post("/api/admin/certificates/issue", json=req_bad_creator, headers=auth_headers["admin_user"])
     assert res1.status_code == 400
     assert "not the original creator" in res1.json()["detail"]
 
@@ -151,11 +151,11 @@ def test_peer_educator_ineligible_for_non_creator_or_unpublished(client):
         "certificate_type": "PEER_EDUCATOR",
         "is_sample": True
     }
-    res2 = client.post("/api/admin/certificates/issue", json=req_unpublished, headers={"X-User-Id": "admin_user", "X-User-Role": "admin"})
+    res2 = client.post("/api/admin/certificates/issue", json=req_unpublished, headers=auth_headers["admin_user"])
     assert res2.status_code == 400
     assert "must be approved and published" in res2.json()["detail"]
 
-def test_peer_educator_success_and_admin_role_restriction(client):
+def test_peer_educator_success_and_admin_role_restriction(client, auth_headers):
     # Non-admin cannot issue certificates -> 403 Forbidden
     req_payload = {
         "recipient_id": "creator_student",
@@ -163,11 +163,11 @@ def test_peer_educator_success_and_admin_role_restriction(client):
         "certificate_type": "PEER_EDUCATOR",
         "is_sample": True
     }
-    unauth_res = client.post("/api/admin/certificates/issue", json=req_payload, headers={"X-User-Id": "student_user", "X-User-Role": "student"})
+    unauth_res = client.post("/api/admin/certificates/issue", json=req_payload, headers=auth_headers["student_user"])
     assert unauth_res.status_code == 403
 
     # Admin issues Peer Educator certificate -> 201 Created
-    issue_res = client.post("/api/admin/certificates/issue", json=req_payload, headers={"X-User-Id": "admin_user", "X-User-Role": "admin"})
+    issue_res = client.post("/api/admin/certificates/issue", json=req_payload, headers=auth_headers["admin_user"])
     assert issue_res.status_code == 201
     cert_data = issue_res.json()
     assert cert_data["certificate_type"] == "PEER_EDUCATOR"

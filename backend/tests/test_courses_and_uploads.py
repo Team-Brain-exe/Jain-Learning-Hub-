@@ -3,7 +3,7 @@ from app.models.upload_permission import VerifiedFaculty, UploadPermission, Perm
 
 @pytest.fixture(autouse=True)
 def seed_test_data(db_session):
-    f1 = VerifiedFaculty(id="fac_cse", name="Dr. Rao", email="rao@jain.ac.in", department="CSE", is_active=True)
+    f1 = VerifiedFaculty(id="fac_cse", name="Dr. Rao", email="rao.cse.test@example.com", department="CSE", is_active=True)
     db_session.add(f1)
     
     # Seed an APPROVED upload permission for student_101
@@ -33,7 +33,7 @@ def seed_test_data(db_session):
 
 # ==================== UPLOAD GATING & FILE VALIDATION TESTS ====================
 
-def test_upload_init_fails_without_approved_permission(client):
+def test_upload_init_fails_without_approved_permission(client, auth_headers):
     payload = {
         "permission_id": "perm_pend_101",
         "file_name": "lesson1.pdf",
@@ -41,11 +41,11 @@ def test_upload_init_fails_without_approved_permission(client):
         "mime_type": "application/pdf",
         "file_size_bytes": 1024 * 500
     }
-    res = client.post("/api/uploads/request", json=payload, headers={"X-User-Id": "student_101", "X-User-Role": "student"})
+    res = client.post("/api/uploads/request", json=payload, headers=auth_headers["student_101"])
     assert res.status_code == 403
-    assert "not approved" in res.json()["detail"]
+    assert "not been approved" in res.json()["detail"]
 
-def test_upload_init_fails_for_cross_student_permission(client):
+def test_upload_init_fails_for_cross_student_permission(client, auth_headers):
     payload = {
         "permission_id": "perm_appr_101",
         "file_name": "intro.mp4",
@@ -53,11 +53,11 @@ def test_upload_init_fails_for_cross_student_permission(client):
         "mime_type": "video/mp4",
         "file_size_bytes": 1024 * 1024 * 10
     }
-    res = client.post("/api/uploads/request", json=payload, headers={"X-User-Id": "student_200", "X-User-Role": "student"})
+    res = client.post("/api/uploads/request", json=payload, headers=auth_headers["student_200"])
     assert res.status_code == 403
     assert "does not belong to you" in res.json()["detail"]
 
-def test_upload_init_fails_on_mime_mismatch_or_oversize(client):
+def test_upload_init_fails_on_mime_mismatch_or_oversize(client, auth_headers):
     payload_bad_mime = {
         "permission_id": "perm_appr_101",
         "file_name": "malware.exe",
@@ -65,7 +65,7 @@ def test_upload_init_fails_on_mime_mismatch_or_oversize(client):
         "mime_type": "application/x-msdownload",
         "file_size_bytes": 1024
     }
-    res1 = client.post("/api/uploads/request", json=payload_bad_mime, headers={"X-User-Id": "student_101", "X-User-Role": "student"})
+    res1 = client.post("/api/uploads/request", json=payload_bad_mime, headers=auth_headers["student_101"])
     assert res1.status_code == 422
 
     payload_oversize = {
@@ -75,10 +75,10 @@ def test_upload_init_fails_on_mime_mismatch_or_oversize(client):
         "mime_type": "image/png",
         "file_size_bytes": 20 * 1024 * 1024
     }
-    res2 = client.post("/api/uploads/request", json=payload_oversize, headers={"X-User-Id": "student_101", "X-User-Role": "student"})
+    res2 = client.post("/api/uploads/request", json=payload_oversize, headers=auth_headers["student_101"])
     assert res2.status_code == 422
 
-def test_upload_lifecycle_init_and_finalize_success(client):
+def test_upload_lifecycle_init_and_finalize_success(client, auth_headers):
     init_payload = {
         "permission_id": "perm_appr_101",
         "file_name": "binary_trees.mp4",
@@ -86,7 +86,7 @@ def test_upload_lifecycle_init_and_finalize_success(client):
         "mime_type": "video/mp4",
         "file_size_bytes": 25 * 1024 * 1024
     }
-    init_res = client.post("/api/uploads/request", json=init_payload, headers={"X-User-Id": "student_101", "X-User-Role": "student"})
+    init_res = client.post("/api/uploads/request", json=init_payload, headers=auth_headers["student_101"])
     assert init_res.status_code == 201
     init_data = init_res.json()
     assert init_data["upload_status"] == "INITIALIZED"
@@ -97,14 +97,14 @@ def test_upload_lifecycle_init_and_finalize_success(client):
         "permission_id": "perm_appr_101",
         "asset_id": asset_id
     }
-    final_res = client.post("/api/uploads/finalize", json=final_payload, headers={"X-User-Id": "student_101", "X-User-Role": "student"})
+    final_res = client.post("/api/uploads/finalize", json=final_payload, headers=auth_headers["student_101"])
     assert final_res.status_code == 200
     final_data = final_res.json()
     assert final_data["upload_status"] == "FINALIZED"
     assert final_data["id"] == asset_id
     assert final_data["uploader_id"] == "student_101"
 
-def test_upload_finalize_reverifies_authorization(client):
+def test_upload_finalize_reverifies_authorization(client, auth_headers):
     init_payload = {
         "permission_id": "perm_appr_101",
         "file_name": "module1.pdf",
@@ -112,16 +112,16 @@ def test_upload_finalize_reverifies_authorization(client):
         "mime_type": "application/pdf",
         "file_size_bytes": 1024 * 50
     }
-    init_data = client.post("/api/uploads/request", json=init_payload, headers={"X-User-Id": "student_101", "X-User-Role": "student"}).json()
+    init_data = client.post("/api/uploads/request", json=init_payload, headers=auth_headers["student_101"]).json()
     asset_id = init_data["asset_id"]
 
     final_payload = {"permission_id": "perm_appr_101", "asset_id": asset_id}
-    res = client.post("/api/uploads/finalize", json=final_payload, headers={"X-User-Id": "student_hacker", "X-User-Role": "student"})
+    res = client.post("/api/uploads/finalize", json=final_payload, headers=auth_headers["student_hacker"])
     assert res.status_code == 403
 
 # ==================== COURSE, MODULE, LESSON CRUD TESTS ====================
 
-def test_course_creation_enforces_approved_permission(client):
+def test_course_creation_enforces_approved_permission(client, auth_headers):
     course_payload = {
         "permission_id": "perm_pend_101",
         "title": "Unauthorized Course",
@@ -129,10 +129,10 @@ def test_course_creation_enforces_approved_permission(client):
         "level": "beginner",
         "modules": []
     }
-    res = client.post("/api/courses", json=course_payload, headers={"X-User-Id": "student_101", "X-User-Role": "student"})
+    res = client.post("/api/courses", json=course_payload, headers=auth_headers["student_101"])
     assert res.status_code == 403
 
-def test_course_creation_with_modules_and_lessons_success(client):
+def test_course_creation_with_modules_and_lessons_success(client, auth_headers):
     course_payload = {
         "permission_id": "perm_appr_101",
         "title": "Full Stack Python Development",
@@ -157,7 +157,7 @@ def test_course_creation_with_modules_and_lessons_success(client):
             }
         ]
     }
-    res = client.post("/api/courses", json=course_payload, headers={"X-User-Id": "student_101", "X-User-Role": "student"})
+    res = client.post("/api/courses", json=course_payload, headers=auth_headers["student_101"])
     assert res.status_code == 201
     data = res.json()
     assert data["status"] == "DRAFT"
@@ -166,7 +166,7 @@ def test_course_creation_with_modules_and_lessons_success(client):
     assert len(data["modules"][0]["lessons"]) == 2
     assert "full-stack-python-development" in data["slug"]
 
-def test_course_visibility_and_catalog_filtering(client):
+def test_course_visibility_and_catalog_filtering(client, auth_headers):
     # 1. Create a DRAFT course
     course_payload = {
         "permission_id": "perm_appr_101",
@@ -174,7 +174,7 @@ def test_course_visibility_and_catalog_filtering(client):
         "category": "academic",
         "level": "beginner"
     }
-    course_res = client.post("/api/courses", json=course_payload, headers={"X-User-Id": "student_101", "X-User-Role": "student"}).json()
+    course_res = client.post("/api/courses", json=course_payload, headers=auth_headers["student_101"]).json()
     c_id = course_res["id"]
 
     # 2. Public catalog /api/courses must NOT display draft courses
@@ -182,27 +182,27 @@ def test_course_visibility_and_catalog_filtering(client):
     assert all(c["id"] != c_id for c in catalog)
 
     # 3. Random student cannot view draft course details -> 403
-    res_other = client.get(f"/api/courses/{c_id}", headers={"X-User-Id": "student_999", "X-User-Role": "student"})
+    res_other = client.get(f"/api/courses/{c_id}", headers=auth_headers["student_999"])
     assert res_other.status_code == 403
 
     # 4. Creator can view their own draft course details -> 200
-    res_creator = client.get(f"/api/courses/{c_id}", headers={"X-User-Id": "student_101", "X-User-Role": "student"})
+    res_creator = client.get(f"/api/courses/{c_id}", headers=auth_headers["student_101"])
     assert res_creator.status_code == 200
     assert res_creator.json()["id"] == c_id
 
-def test_course_update_by_creator(client):
+def test_course_update_by_creator(client, auth_headers):
     course_payload = {
         "permission_id": "perm_appr_101",
         "title": "Original Title",
         "category": "academic",
         "level": "beginner"
     }
-    c_id = client.post("/api/courses", json=course_payload, headers={"X-User-Id": "student_101", "X-User-Role": "student"}).json()["id"]
+    c_id = client.post("/api/courses", json=course_payload, headers=auth_headers["student_101"]).json()["id"]
 
-    patch_unauth = client.patch(f"/api/courses/{c_id}", json={"title": "Hacked Title"}, headers={"X-User-Id": "student_200", "X-User-Role": "student"})
+    patch_unauth = client.patch(f"/api/courses/{c_id}", json={"title": "Hacked Title"}, headers=auth_headers["student_200"])
     assert patch_unauth.status_code == 403
 
-    patch_res = client.patch(f"/api/courses/{c_id}", json={"title": "Updated Title", "level": "advanced"}, headers={"X-User-Id": "student_101", "X-User-Role": "student"})
+    patch_res = client.patch(f"/api/courses/{c_id}", json={"title": "Updated Title", "level": "advanced"}, headers=auth_headers["student_101"])
     assert patch_res.status_code == 200
     assert patch_res.json()["title"] == "Updated Title"
     assert patch_res.json()["level"] == "advanced"

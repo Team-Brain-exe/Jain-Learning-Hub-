@@ -7,7 +7,7 @@ from app.models.learning import Quiz, QuizQuestion
 @pytest.fixture(autouse=True)
 def seed_learning_environment(db_session):
     # 1. Faculty & approved permission
-    f1 = VerifiedFaculty(id="fac_cse", name="Dr. Rao", email="rao@jain.ac.in", department="CSE", is_active=True)
+    f1 = VerifiedFaculty(id="fac_cse", name="Dr. Rao", email="rao.cse.test@example.com", department="CSE", is_active=True)
     db_session.add(f1)
     
     perm = UploadPermission(
@@ -82,61 +82,61 @@ def seed_learning_environment(db_session):
 
 # ==================== ENROLLMENT & PROGRESS TESTS ====================
 
-def test_enrollment_in_published_vs_unpublished_course(client):
+def test_enrollment_in_published_vs_unpublished_course(client, auth_headers):
     # Attempt enrollment in draft course -> 400 Bad Request
-    draft_res = client.post("/api/courses/course_draft_02/enroll", headers={"X-User-Id": "learner_101", "X-User-Role": "student"})
+    draft_res = client.post("/api/courses/course_draft_02/enroll", headers=auth_headers["learner_101"])
     assert draft_res.status_code == 400
 
     # Enroll in published course -> 201 Created
-    pub_res = client.post("/api/courses/course_pub_01/enroll", headers={"X-User-Id": "learner_101", "X-User-Role": "student"})
+    pub_res = client.post("/api/courses/course_pub_01/enroll", headers=auth_headers["learner_101"])
     assert pub_res.status_code == 201
     assert pub_res.json()["student_id"] == "learner_101"
     assert pub_res.json()["course_id"] == "course_pub_01"
 
     # Idempotent: re-enrolling returns existing enrollment without duplicate
-    dup_res = client.post("/api/courses/course_pub_01/enroll", headers={"X-User-Id": "learner_101", "X-User-Role": "student"})
+    dup_res = client.post("/api/courses/course_pub_01/enroll", headers=auth_headers["learner_101"])
     assert dup_res.status_code == 200
     assert dup_res.json()["id"] == pub_res.json()["id"]
 
-def test_lesson_progress_requires_enrollment(client):
+def test_lesson_progress_requires_enrollment(client, auth_headers):
     # Learner NOT enrolled attempts to mark lesson complete -> 403 Forbidden
     res_unauth = client.post(
         "/api/lessons/les_01/progress",
         json={"is_completed": True},
-        headers={"X-User-Id": "unregistered_student", "X-User-Role": "student"}
+        headers=auth_headers["unregistered_student"]
     )
     assert res_unauth.status_code == 403
     assert "must be enrolled" in res_unauth.json()["detail"]
 
-def test_lesson_progress_tracking_and_course_completion(client):
+def test_lesson_progress_tracking_and_course_completion(client, auth_headers):
     # 1. Enroll learner
-    client.post("/api/courses/course_pub_01/enroll", headers={"X-User-Id": "learner_101", "X-User-Role": "student"})
+    client.post("/api/courses/course_pub_01/enroll", headers=auth_headers["learner_101"])
 
     # 2. Check initial progress (0%)
-    p0 = client.get("/api/courses/course_pub_01/progress", headers={"X-User-Id": "learner_101", "X-User-Role": "student"}).json()
+    p0 = client.get("/api/courses/course_pub_01/progress", headers=auth_headers["learner_101"]).json()
     assert p0["total_lessons"] == 2
     assert p0["completed_lessons"] == 0
     assert p0["progress_percentage"] == 0.0
     assert p0["is_course_completed"] is False
 
     # 3. Complete lesson 1 -> 50%
-    client.post("/api/lessons/les_01/progress", json={"is_completed": True}, headers={"X-User-Id": "learner_101", "X-User-Role": "student"})
-    p1 = client.get("/api/courses/course_pub_01/progress", headers={"X-User-Id": "learner_101", "X-User-Role": "student"}).json()
+    client.post("/api/lessons/les_01/progress", json={"is_completed": True}, headers=auth_headers["learner_101"])
+    p1 = client.get("/api/courses/course_pub_01/progress", headers=auth_headers["learner_101"]).json()
     assert p1["completed_lessons"] == 1
     assert p1["progress_percentage"] == 50.0
 
     # 4. Complete lesson 2 -> 100%
-    client.post("/api/lessons/les_02/progress", json={"is_completed": True}, headers={"X-User-Id": "learner_101", "X-User-Role": "student"})
-    p2 = client.get("/api/courses/course_pub_01/progress", headers={"X-User-Id": "learner_101", "X-User-Role": "student"}).json()
+    client.post("/api/lessons/les_02/progress", json={"is_completed": True}, headers=auth_headers["learner_101"])
+    p2 = client.get("/api/courses/course_pub_01/progress", headers=auth_headers["learner_101"]).json()
     assert p2["completed_lessons"] == 2
     assert p2["progress_percentage"] == 100.0
     assert p2["is_course_completed"] is True
 
 # ==================== QUIZ & ANTI-FORGERY TESTS ====================
 
-def test_quiz_attempt_anti_forgery_and_passing_threshold(client):
+def test_quiz_attempt_anti_forgery_and_passing_threshold(client, auth_headers):
     # Enroll learner
-    client.post("/api/courses/course_pub_01/enroll", headers={"X-User-Id": "learner_101", "X-User-Role": "student"})
+    client.post("/api/courses/course_pub_01/enroll", headers=auth_headers["learner_101"])
 
     # Attempt quiz with failing answers (0/2 = 0% < 70%)
     failing_submission = {
@@ -145,7 +145,7 @@ def test_quiz_attempt_anti_forgery_and_passing_threshold(client):
             {"question_id": "q_02", "selected_option_index": 1}   # incorrect
         ]
     }
-    fail_res = client.post("/api/quizzes/quiz_01/attempts", json=failing_submission, headers={"X-User-Id": "learner_101", "X-User-Role": "student"})
+    fail_res = client.post("/api/quizzes/quiz_01/attempts", json=failing_submission, headers=auth_headers["learner_101"])
     assert fail_res.status_code == 200
     fail_data = fail_res.json()
     assert fail_data["score_percentage"] == 0.0
@@ -158,7 +158,7 @@ def test_quiz_attempt_anti_forgery_and_passing_threshold(client):
             {"question_id": "q_02", "selected_option_index": 0}   # correct
         ]
     }
-    pass_res = client.post("/api/quizzes/quiz_01/attempts", json=passing_submission, headers={"X-User-Id": "learner_101", "X-User-Role": "student"})
+    pass_res = client.post("/api/quizzes/quiz_01/attempts", json=passing_submission, headers=auth_headers["learner_101"])
     assert pass_res.status_code == 200
     pass_data = pass_res.json()
     assert pass_data["correct_answers"] == 2

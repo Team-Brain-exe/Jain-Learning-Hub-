@@ -23,7 +23,7 @@ def seed_test_submission_data(db_session):
     db_session.add(perm)
     db_session.commit()
 
-def test_course_submission_triggers_ai_job_and_state_transition(client):
+def test_course_submission_triggers_ai_job_and_state_transition(client, auth_headers):
     # 1. Create Course Draft
     course_payload = {
         "permission_id": "perm_course_sub",
@@ -37,24 +37,24 @@ def test_course_submission_triggers_ai_job_and_state_transition(client):
             }
         ]
     }
-    c_res = client.post("/api/courses", json=course_payload, headers={"X-User-Id": "student_creator", "X-User-Role": "student"})
+    c_res = client.post("/api/courses", json=course_payload, headers=auth_headers["student_creator"])
     assert c_res.status_code == 201
     c_id = c_res.json()["id"]
     assert c_res.json()["status"] == "DRAFT"
 
     # 2. Non-owner cannot submit course -> 403 Forbidden
-    unauth_sub = client.post(f"/api/courses/{c_id}/submit", headers={"X-User-Id": "student_other", "X-User-Role": "student"})
+    unauth_sub = client.post(f"/api/courses/{c_id}/submit", headers=auth_headers["student_other"])
     assert unauth_sub.status_code == 403
 
     # 3. Creator submits course -> 200 OK
-    sub_res = client.post(f"/api/courses/{c_id}/submit", headers={"X-User-Id": "student_creator", "X-User-Role": "student"})
+    sub_res = client.post(f"/api/courses/{c_id}/submit", headers=auth_headers["student_creator"])
     assert sub_res.status_code == 200
     sub_data = sub_res.json()
     assert sub_data["course_id"] == c_id
     assert sub_data["status"] == "FACULTY_REVIEW"
     assert sub_data["ai_job_id"] is not None
 
-def test_faculty_review_listing_and_inspection(client):
+def test_faculty_review_listing_and_inspection(client, auth_headers):
     # 1. Create and submit course
     course_payload = {
         "permission_id": "perm_course_sub",
@@ -62,20 +62,20 @@ def test_faculty_review_listing_and_inspection(client):
         "category": "academic",
         "level": "advanced"
     }
-    c_id = client.post("/api/courses", json=course_payload, headers={"X-User-Id": "student_creator", "X-User-Role": "student"}).json()["id"]
-    client.post(f"/api/courses/{c_id}/submit", headers={"X-User-Id": "student_creator", "X-User-Role": "student"})
+    c_id = client.post("/api/courses", json=course_payload, headers=auth_headers["student_creator"]).json()["id"]
+    client.post(f"/api/courses/{c_id}/submit", headers=auth_headers["student_creator"])
 
     # 2. Assigned faculty lists pending reviews -> 200 OK
-    fac_reviews = client.get("/api/courses/faculty/reviews", headers={"X-User-Id": "fac_reviewer", "X-User-Role": "faculty"})
+    fac_reviews = client.get("/api/courses/faculty/reviews", headers=auth_headers["fac_reviewer"])
     assert fac_reviews.status_code == 200
     assert any(c["id"] == c_id for c in fac_reviews.json())
 
     # 3. Unassigned faculty cannot view detail -> 403
-    unassigned_view = client.get(f"/api/courses/faculty/reviews/{c_id}", headers={"X-User-Id": "fac_unassigned", "X-User-Role": "faculty"})
+    unassigned_view = client.get(f"/api/courses/faculty/reviews/{c_id}", headers=auth_headers["fac_unassigned"])
     assert unassigned_view.status_code == 403
 
     # 4. Assigned faculty views detailed review including AI findings
-    fac_detail = client.get(f"/api/courses/faculty/reviews/{c_id}", headers={"X-User-Id": "fac_reviewer", "X-User-Role": "faculty"})
+    fac_detail = client.get(f"/api/courses/faculty/reviews/{c_id}", headers=auth_headers["fac_reviewer"])
     assert fac_detail.status_code == 200
     detail_data = fac_detail.json()
     assert detail_data["course_id"] == c_id
@@ -83,7 +83,7 @@ def test_faculty_review_listing_and_inspection(client):
     assert detail_data["latest_ai_job"]["status"] == "COMPLETED"
     assert len(detail_data["latest_ai_job"]["findings"]) > 0
 
-def test_faculty_decision_publication_workflow(client):
+def test_faculty_decision_publication_workflow(client, auth_headers):
     # Create and submit course
     course_payload = {
         "permission_id": "perm_course_sub",
@@ -91,8 +91,8 @@ def test_faculty_decision_publication_workflow(client):
         "category": "academic",
         "level": "intermediate"
     }
-    c_id = client.post("/api/courses", json=course_payload, headers={"X-User-Id": "student_creator", "X-User-Role": "student"}).json()["id"]
-    client.post(f"/api/courses/{c_id}/submit", headers={"X-User-Id": "student_creator", "X-User-Role": "student"})
+    c_id = client.post("/api/courses", json=course_payload, headers=auth_headers["student_creator"]).json()["id"]
+    client.post(f"/api/courses/{c_id}/submit", headers=auth_headers["student_creator"])
 
     # Before faculty approval: Course must NOT be in public catalog
     catalog_before = client.get("/api/courses").json()
@@ -102,7 +102,7 @@ def test_faculty_decision_publication_workflow(client):
     dec_res = client.post(
         f"/api/courses/faculty/reviews/{c_id}/decision",
         json={"decision": "APPROVE", "remarks": "Excellent academic rigor and presentation."},
-        headers={"X-User-Id": "fac_reviewer", "X-User-Role": "faculty"}
+        headers=auth_headers["fac_reviewer"]
     )
     assert dec_res.status_code == 200
     assert dec_res.json()["status"] == "PUBLISHED"
@@ -111,7 +111,7 @@ def test_faculty_decision_publication_workflow(client):
     catalog_after = client.get("/api/courses").json()
     assert any(c["id"] == c_id for c in catalog_after)
 
-def test_faculty_request_revision_workflow(client):
+def test_faculty_request_revision_workflow(client, auth_headers):
     # Create and submit course
     course_payload = {
         "permission_id": "perm_course_sub",
@@ -119,14 +119,14 @@ def test_faculty_request_revision_workflow(client):
         "category": "academic",
         "level": "beginner"
     }
-    c_id = client.post("/api/courses", json=course_payload, headers={"X-User-Id": "student_creator", "X-User-Role": "student"}).json()["id"]
-    client.post(f"/api/courses/{c_id}/submit", headers={"X-User-Id": "student_creator", "X-User-Role": "student"})
+    c_id = client.post("/api/courses", json=course_payload, headers=auth_headers["student_creator"]).json()["id"]
+    client.post(f"/api/courses/{c_id}/submit", headers=auth_headers["student_creator"])
 
     # Faculty requests revision with remarks
     rev_res = client.post(
         f"/api/courses/faculty/reviews/{c_id}/decision",
         json={"decision": "REQUEST_REVISION", "remarks": "Please fix slide 4 qubit definition."},
-        headers={"X-User-Id": "fac_reviewer", "X-User-Role": "faculty"}
+        headers=auth_headers["fac_reviewer"]
     )
     assert rev_res.status_code == 200
     assert rev_res.json()["status"] == "REVISION_REQUESTED"
@@ -139,7 +139,7 @@ def test_faculty_request_revision_workflow(client):
     patch_res = client.patch(
         f"/api/courses/{c_id}",
         json={"description": "Updated with corrected qubit diagrams"},
-        headers={"X-User-Id": "student_creator", "X-User-Role": "student"}
+        headers=auth_headers["student_creator"]
     )
     assert patch_res.status_code == 200
     assert patch_res.json()["description"] == "Updated with corrected qubit diagrams"
