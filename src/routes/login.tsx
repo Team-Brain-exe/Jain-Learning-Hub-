@@ -68,7 +68,7 @@ function Login() {
             })}
           </div>
           {user && <button onClick={() => { signOut(); toast.success("Signed out"); }} className="mt-3 text-sm font-semibold text-primary">Sign out</button>}
-          {!user && <Link to="/my-learning" className="mt-3 inline-block text-xs text-muted-foreground underline">Continue as guest</Link>}
+          {!user && <Link to="/my-learning" className="mt-1 inline-flex min-h-10 items-center text-xs text-muted-foreground underline">Continue as guest</Link>}
         </div>
       </div>
     </div>

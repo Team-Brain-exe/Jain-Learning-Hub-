@@ -106,7 +106,7 @@ export function SiteHeader() {
             </PopoverContent>
           </Popover>
           <DropdownMenu>
-            <DropdownMenuTrigger aria-label="Account" className="ml-1 grid h-9 w-9 place-items-center rounded-full bg-navy text-navy-foreground"><User className="h-4 w-4" /></DropdownMenuTrigger>
+            <DropdownMenuTrigger aria-label="Account" className="ml-1 grid h-10 w-10 place-items-center rounded-full bg-navy text-navy-foreground"><User className="h-4 w-4" /></DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               {user ? (
                 <>

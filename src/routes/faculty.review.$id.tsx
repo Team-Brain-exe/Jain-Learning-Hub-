@@ -32,7 +32,7 @@ function Review() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <Link to="/faculty" className="text-sm font-semibold text-primary">← Review queue</Link>
+      <Link to="/faculty" className="inline-flex min-h-10 items-center text-sm font-semibold text-primary">← Review queue</Link>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-extrabold tracking-tight">{sub.title}</h1><StatusBadge status={sub.status} />
       </div>
