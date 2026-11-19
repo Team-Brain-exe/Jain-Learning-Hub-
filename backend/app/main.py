@@ -6,7 +6,7 @@ from app.models.course import Course, Module, Lesson, MediaAsset
 from app.models.ai_review import AIReviewJob, AIFinding
 from app.models.learning import Enrollment, LessonProgress, Quiz, QuizQuestion, QuizAttempt
 from app.models.certificate import Certificate
-from app.routers import upload_permissions, courses, uploads, learning, certificates
+from app.routers import upload_permissions, courses, uploads, learning, certificates, ai_reviews
 
 # Create DB tables
 Base.metadata.create_all(bind=engine)
@@ -65,4 +65,5 @@ app.include_router(courses.router)
 app.include_router(uploads.router)
 app.include_router(learning.router)
 app.include_router(certificates.router)
+app.include_router(ai_reviews.router)
 

@@ -8,7 +8,11 @@ from app.database import Base
 class AIJobStatus(str, enum.Enum):
     QUEUED = "QUEUED"
     PROCESSING = "PROCESSING"
+    EXTRACTING = "EXTRACTING"
+    TRANSCRIBING = "TRANSCRIBING"
+    VERIFYING = "VERIFYING"
     COMPLETED = "COMPLETED"
+    PARTIAL = "PARTIAL"
     FAILED = "FAILED"
 
 class FindingSeverity(str, enum.Enum):
@@ -31,6 +35,9 @@ class AIReviewJob(Base):
     status = Column(Enum(AIJobStatus), default=AIJobStatus.QUEUED, nullable=False)
     summary = Column(Text, nullable=True)
     error_message = Column(Text, nullable=True)
+    transcripts_json = Column(Text, nullable=True)
+    total_segments = Column(Integer, default=0, nullable=True)
+    total_claims = Column(Integer, default=0, nullable=True)
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
@@ -49,8 +56,11 @@ class AIFinding(Base):
     severity = Column(Enum(FindingSeverity), default=FindingSeverity.MEDIUM, nullable=False)
     claim = Column(Text, nullable=False)
     source_location = Column(String(255), nullable=True)  # e.g., "timestamp: 04:32" or "slide: 6"
+    conflicting_location = Column(String(255), nullable=True)  # For cross-asset contradictions
     explanation = Column(Text, nullable=False)
     suggested_correction = Column(Text, nullable=True)
+    references_json = Column(Text, nullable=True)  # JSON-serialized list of references
+    confidence = Column(Float, default=0.9, nullable=True)
     requires_human_review = Column(Boolean, default=True, nullable=False)
 
     review_job = relationship("AIReviewJob", back_populates="findings")
