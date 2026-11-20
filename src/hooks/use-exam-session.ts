@@ -109,14 +109,17 @@ export function useExamSession({
     latest.current = { user, slug, quiz, exit: fs.exit };
   });
 
-  /** Single gate for every way an exam can end: runs `run` at most once per session. */
-  const finishedRef = useRef(false);
-  const settle = useCallback((run: () => QuizAttempt | string | null) => {
-    if (finishedRef.current) return;
-    finishedRef.current = true;
+  /**
+   * Single gate for every way an exam can end. Keyed by session identity (`startedAt`), so it
+   * closes once per session, never per mount: a failed finish cannot block a later session.
+   */
+  const settledFor = useRef<string | null>(null);
+  const settle = useCallback((startedAt: string, run: () => QuizAttempt | string | null) => {
+    if (settledFor.current === startedAt) return;
+    settledFor.current = startedAt;
     const r = run();
     if (r === null) {
-      finishedRef.current = false; // nothing to finish (e.g. not expired yet)
+      settledFor.current = null; // nothing to finish (e.g. not expired yet)
       return;
     }
     setWarning(null);
@@ -130,25 +133,34 @@ export function useExamSession({
   }, []);
 
   const finish = useCallback(
-    (reason?: "timeout" | "violations") =>
-      settle(() => {
+    (reason?: "timeout" | "violations") => {
+      const cur = examSessions.get()[key];
+      if (!cur) return;
+      settle(cur.startedAt, () => {
         const { user: u, slug: s, quiz: q } = latest.current;
         return finishExam(u, s, q, reason);
-      }),
-    [settle],
+      });
+    },
+    [key, settle],
   );
 
   // Mount / identity change: close out an expired session, otherwise resume it.
   useEffect(() => {
     const { user: u, slug: s, quiz: q } = latest.current;
-    settle(() => finalizeExpired(u, s, q));
-    if (finishedRef.current) return;
+    const cur = examSessions.get()[key];
+    if (!cur) return;
+    settle(cur.startedAt, () => finalizeExpired(u, s, q));
+    if (settledFor.current === cur.startedAt) return;
     if (resumeExam(s, u.id, q)) setFsLost(true); // a reload always drops fullscreen
   }, [key, settle]);
 
   const live = !!session && !result;
   const owner = live && session.tabId === tabId;
   const otherTabActive = live && otherTabLive(session, tabId, clock);
+  const ownerRef = useRef(owner);
+  useEffect(() => {
+    ownerRef.current = owner;
+  });
 
   // Heartbeat while owning; tick the clock regardless so a dead owner goes stale.
   useEffect(() => {
@@ -175,19 +187,27 @@ export function useExamSession({
     if (ownerGone) claimTab(key, tabId);
   }, [ownerGone, key, tabId]);
 
-  const { secondsLeft } = useCountdown(live ? session.deadlineMs : null, () => finish("timeout"));
+  // Only the owning tab submits on expiry, so two tabs never both submit. Others rely on
+  // finalizeExpired and the store sync (or on becoming the owner, handled just below).
+  const deadline = live ? session.deadlineMs : null;
+  const { secondsLeft } = useCountdown(deadline, () => {
+    if (ownerRef.current) finish("timeout");
+  });
+  useEffect(() => {
+    if (owner && deadline !== null && Date.now() >= deadline) finish("timeout");
+  }, [owner, deadline, secondsLeft, finish]);
 
   const onViolation = useCallback(
     (type: ViolationType) => {
-      if (finishedRef.current) return;
-      const cur = examSessions.get()[key];
-      if (!cur) return;
+      const before = examSessions.get()[key];
+      if (!before || settledFor.current === before.startedAt) return;
       const counted = !UNCOUNTED.has(type);
       const at = new Date().toISOString();
-      recordViolation(key, { type, at, counted });
+      if (!recordViolation(key, { type, at, counted })) return; // past the deadline
       if (type === "fullscreen_exit" && requireFullscreen) setFsLost(true);
       if (!counted) return;
-      const n = cur.violations.filter((v) => v.counted).length + 1;
+      const cur = examSessions.get()[key];
+      const n = (cur ?? before).violations.filter((v) => v.counted).length;
       if (n >= maxViolations) {
         finish("violations");
         return;
@@ -211,15 +231,25 @@ export function useExamSession({
   const start = useCallback(async (): Promise<void> => {
     // Must run before any await: browsers only grant fullscreen inside the click's gesture.
     const entering = requireFullscreen ? fs.enter() : null;
-    finishedRef.current = false;
     setResult(null);
     setError(null);
     setWarning(null);
     setReviewing(false);
     setFsLost(false);
     const { user: u, slug: s, quiz: q } = latest.current;
-    startExam(u, s, q, tabId);
-    if (requireFullscreen && !fs.supported) {
+    const started = startExam(u, s, q, tabId);
+    if (typeof started === "string") {
+      setError(started);
+      if (entering) {
+        void entering.then((ok) => {
+          if (ok) void fs.exit();
+        });
+      }
+      return;
+    }
+    // Logged once per session: a double click (or a resume) must not log it twice.
+    const logged = started.violations.some((v) => v.type === "fullscreen_unsupported");
+    if (!logged && requireFullscreen && !fs.supported) {
       recordViolation(key, {
         type: "fullscreen_unsupported",
         at: new Date().toISOString(),

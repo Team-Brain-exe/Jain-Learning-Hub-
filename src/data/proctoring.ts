@@ -5,6 +5,7 @@
  */
 import {
   isCorrect,
+  platform,
   submitAttempt,
   type AppUser,
   type Quiz,
@@ -143,39 +144,92 @@ export const examSessions = createStore<Record<string, ExamSession>>(SESSIONS_KE
 
 export const sessionKey = (slug: string, userId: string): string => `${slug}:${userId}`;
 
-/** True when the in-memory sessions match what localStorage holds (i.e. the last write stuck). */
-function persisted(): boolean {
+/** The raw localStorage value this tab last read or successfully wrote. */
+let lastSeen: string | null | undefined;
+
+const readRaw = (): string | null | undefined => {
   try {
-    return localStorage.getItem(SESSIONS_KEY) === JSON.stringify(examSessions.get());
+    return localStorage.getItem(SESSIONS_KEY);
   } catch {
-    return false;
+    return undefined; // storage unavailable
   }
+};
+
+/**
+ * Adopts what another tab wrote since we last looked, so a write never serialises a stale cache
+ * over it (bfcache restore, a heartbeat racing a takeover's `storage` event). When storage is
+ * blocked the raw value never changes, so the in-memory sessions stay authoritative.
+ */
+function sync(): Record<string, ExamSession> {
+  const raw = readRaw();
+  if (raw !== undefined && raw !== lastSeen) {
+    lastSeen = raw;
+    try {
+      examSessions.set(raw ? (JSON.parse(raw) as Record<string, ExamSession>) : {});
+    } catch {
+      /* corrupt value: keep the cache */
+    }
+  }
+  return examSessions.get();
 }
 
-/** Applies `fn` to one session; returns false when there is no such session. */
-function patch(key: string, fn: (s: ExamSession) => ExamSession): boolean {
-  const cur = examSessions.get()[key];
-  if (!cur) return false;
-  examSessions.update((all) => ({ ...all, [key]: fn(cur) }));
+/** Writes all sessions; true when the write reached localStorage (read back to check). */
+function commit(next: Record<string, ExamSession>): boolean {
+  examSessions.set(next);
+  const json = JSON.stringify(next);
+  const raw = readRaw();
+  if (raw !== json) return false;
+  lastSeen = raw;
   return true;
+}
+
+const expired = (s: ExamSession, now = Date.now()): boolean => now > s.deadlineMs;
+
+/**
+ * Applies `fn` to one freshly-read session. Returns false when there is no such session, when
+ * `open` is set and the deadline has passed, or when the write did not persist.
+ */
+function patch(
+  key: string,
+  fn: (s: ExamSession) => ExamSession,
+  { open = false }: { open?: boolean } = {},
+): boolean {
+  const all = sync();
+  const cur = all[key];
+  if (!cur || (open && expired(cur))) return false;
+  return commit({ ...all, [key]: fn(cur) });
 }
 
 const identity = (n: number): number[] => Array.from({ length: n }, (_, i) => i);
 
-/** → GET /api/exams/:slug/session */
+/** → GET /api/exams/:slug/session — a pure read of this tab's view (safe during render). */
 export const getActiveSession = (slug: string, userId: string): ExamSession | undefined =>
   examSessions.get()[sessionKey(slug, userId)];
 
+export const NO_ATTEMPTS_LEFT = "You have used all attempts for this assessment.";
+
 /**
  * → POST /api/exams/:slug/session
- * Creates the session (or returns the existing one, so a double click never resets the clock).
+ * Creates the session, or returns the existing one (resume is always allowed, and a double click
+ * never resets the clock). Returns an error string, without creating anything, when the user has
+ * no attempts left.
  */
-export function startExam(user: AppUser, slug: string, quiz: Quiz, tabId: string): ExamSession {
+export function startExam(
+  user: AppUser,
+  slug: string,
+  quiz: Quiz,
+  tabId: string,
+): ExamSession | string {
   const cfg = quiz.proctor;
   if (!cfg) throw new Error("startExam needs a quiz with proctor settings.");
   const key = sessionKey(slug, user.id);
-  const existing = examSessions.get()[key];
+  const all = sync();
+  const existing = all[key];
   if (existing) return existing;
+  const used = platform
+    .get()
+    .attempts.filter((a) => a.userId === user.id && a.slug === slug).length;
+  if (used >= quiz.maxAttempts) return NO_ATTEMPTS_LEFT;
 
   const now = Date.now();
   const startedAt = new Date(now).toISOString();
@@ -202,32 +256,39 @@ export function startExam(user: AppUser, slug: string, quiz: Quiz, tabId: string
     tabId,
     lastBeat: now,
   };
-  examSessions.update((all) => ({ ...all, [key]: session }));
+  commit({ ...all, [key]: session });
   return session;
 }
 
 /**
  * → PUT /api/exams/:slug/session/answers/:qid
  * `a` holds ORIGINAL option indices; undefined or [] clears the answer.
- * Returns false when the answer could not be persisted (no session, or storage blocked/full);
- * the in-memory session still holds it so the exam keeps running.
+ * Returns false when there is no session, the deadline has passed, or the answer could not be
+ * persisted (storage blocked/full); in that last case the in-memory session still holds it.
  */
 export function saveAnswer(key: string, qid: string, a: number | number[] | undefined): boolean {
-  const ok = patch(key, (s) => {
-    const answers = { ...s.answers };
-    if (a === undefined || !isAnswered(a)) delete answers[qid];
-    else answers[qid] = a;
-    return { ...s, answers };
-  });
-  return ok && persisted();
+  return patch(
+    key,
+    (s) => {
+      const answers = { ...s.answers };
+      if (a === undefined || !isAnswered(a)) delete answers[qid];
+      else answers[qid] = a;
+      return { ...s, answers };
+    },
+    { open: true },
+  );
 }
 
-/** → POST /api/exams/:slug/session/flags/:qid */
-export function toggleFlag(key: string, qid: string): void {
-  patch(key, (s) => ({
-    ...s,
-    flagged: s.flagged.includes(qid) ? s.flagged.filter((x) => x !== qid) : [...s.flagged, qid],
-  }));
+/** → POST /api/exams/:slug/session/flags/:qid — false after the deadline or with no session. */
+export function toggleFlag(key: string, qid: string): boolean {
+  return patch(
+    key,
+    (s) => ({
+      ...s,
+      flagged: s.flagged.includes(qid) ? s.flagged.filter((x) => x !== qid) : [...s.flagged, qid],
+    }),
+    { open: true },
+  );
 }
 
 /** → PATCH /api/exams/:slug/session { current } */
@@ -238,14 +299,24 @@ export function setCurrent(key: string, index: number): void {
   }));
 }
 
-/** → POST /api/exams/:slug/session/violations */
-export function recordViolation(key: string, v: Violation): void {
-  patch(key, (s) => ({ ...s, violations: [...s.violations, v] }));
+/**
+ * → POST /api/exams/:slug/session/violations
+ * Returns false after the deadline or with no session. The violation is kept in memory even
+ * when storage is blocked, so this does not report persistence.
+ */
+export function recordViolation(key: string, v: Violation): boolean {
+  const s = sync()[key];
+  if (!s || expired(s)) return false;
+  patch(key, (x) => ({ ...x, violations: [...x.violations, v] }));
+  return true;
 }
 
-/** → POST /api/exams/:slug/session/heartbeat — only the owning tab beats; returns ownership. */
+/**
+ * → POST /api/exams/:slug/session/heartbeat
+ * Only the owning tab (per freshly-read storage) beats; a non-owner is a no-op. Returns ownership.
+ */
 export function heartbeat(key: string, tabId: string): boolean {
-  const s = examSessions.get()[key];
+  const s = sync()[key];
   if (!s || s.tabId !== tabId) return false;
   patch(key, (x) => ({ ...x, lastBeat: Date.now() }));
   return true;
@@ -258,7 +329,7 @@ export function claimTab(key: string, tabId: string): void {
 
 /** → POST /api/exams/:slug/session/release — owner leaving (unmount/pagehide); no-op otherwise. */
 export function releaseTab(key: string, tabId: string): void {
-  const s = examSessions.get()[key];
+  const s = sync()[key];
   if (!s || s.tabId !== tabId) return;
   patch(key, (x) => ({ ...x, lastBeat: 0 }));
 }
@@ -276,7 +347,8 @@ export function finishExam(
   reason?: "timeout" | "violations",
 ): QuizAttempt | string {
   const key = sessionKey(slug, user.id);
-  const s = examSessions.get()[key];
+  const all = sync();
+  const s = all[key];
   if (!s) return "This exam has already been submitted.";
   const score = scoreExam(quiz, s.answers);
   const endMs = Math.min(Date.now(), s.deadlineMs);
@@ -288,11 +360,9 @@ export function finishExam(
     sectionScores: score.sections,
     skipped: score.skipped,
   };
-  examSessions.update((all) => {
-    const next = { ...all };
-    delete next[key];
-    return next;
-  });
+  const next = { ...all };
+  delete next[key];
+  commit(next);
   return submitAttempt(user, slug, s.answers, meta);
 }
 
@@ -306,8 +376,8 @@ export function finalizeExpired(
   quiz: Quiz,
   now = Date.now(),
 ): QuizAttempt | null {
-  const s = getActiveSession(slug, user.id);
-  if (!s || now <= s.deadlineMs) return null;
+  const s = sync()[sessionKey(slug, user.id)];
+  if (!s || !expired(s, now)) return null;
   const r = finishExam(user, slug, quiz, "timeout");
   return typeof r === "string" ? null : r;
 }
@@ -350,11 +420,10 @@ export function reconcileOrder(session: ExamSession, quiz: Quiz): ExamSession {
  */
 export function resumeExam(slug: string, userId: string, quiz: Quiz): ExamSession | undefined {
   const key = sessionKey(slug, userId);
-  const s = examSessions.get()[key];
+  const all = sync();
+  const s = all[key];
   if (!s) return undefined;
   const r = reconcileOrder(s, quiz);
-  if (JSON.stringify(r) !== JSON.stringify(s)) {
-    examSessions.update((all) => ({ ...all, [key]: r }));
-  }
+  if (JSON.stringify(r) !== JSON.stringify(s)) commit({ ...all, [key]: r });
   return r;
 }

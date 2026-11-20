@@ -8,6 +8,7 @@ import {
   finishExam,
   getActiveSession,
   heartbeat,
+  NO_ATTEMPTS_LEFT,
   reconcileOrder,
   recordViolation,
   releaseTab,
@@ -16,6 +17,7 @@ import {
   setCurrent,
   startExam,
   toggleFlag,
+  type ExamSession,
 } from "@/data/proctoring";
 
 const SLUG = "data-structures-and-algorithms";
@@ -32,6 +34,27 @@ const quiz = (): Quiz => {
   return q;
 };
 
+const begin = (...args: Parameters<typeof startExam>) => {
+  const r = startExam(...args);
+  if (typeof r === "string") throw new Error(r);
+  return r;
+};
+const KEY = "jfet-exam-sessions-v1";
+const stored = () => JSON.parse(localStorage.getItem(KEY) ?? "{}") as Record<string, ExamSession>;
+const useAllAttempts = () =>
+  platform.update((s) => ({
+    ...s,
+    attempts: [1, 2, 3].map((i) => ({
+      id: `at-${i}`,
+      userId: "u-creator",
+      slug: SLUG,
+      at: "x",
+      score: 0,
+      passed: false,
+      answers: {},
+    })),
+  }));
+
 describe("exam session store", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -45,26 +68,26 @@ describe("exam session store", () => {
   });
 
   it("deadline is now + 2 min, and + 3 min with a 1.5x multiplier", () => {
-    const a = startExam(user("u-creator"), SLUG, quiz(), "tab-a");
+    const a = begin(user("u-creator"), SLUG, quiz(), "tab-a");
     expect(a.deadlineMs).toBe(T0 + 2 * 60_000);
     expect(a.startedAt).toBe(new Date(T0).toISOString());
     expect(a.lastBeat).toBe(T0);
     expect(a.tabId).toBe("tab-a");
-    const b = startExam(user("u-learner"), SLUG, quiz(), "tab-b");
+    const b = begin(user("u-learner"), SLUG, quiz(), "tab-b");
     expect(b.deadlineMs).toBe(T0 + 3 * 60_000);
   });
 
   it("starting again returns the existing session instead of resetting the clock", () => {
-    const a = startExam(user("u-creator"), SLUG, quiz(), "tab-a");
+    const a = begin(user("u-creator"), SLUG, quiz(), "tab-a");
     vi.setSystemTime(T0 + 30_000);
-    const b = startExam(user("u-creator"), SLUG, quiz(), "tab-b");
+    const b = begin(user("u-creator"), SLUG, quiz(), "tab-b");
     expect(b.deadlineMs).toBe(a.deadlineMs);
   });
 
   it("shuffled order is a permutation and stable for the same key and startedAt", () => {
     const q = quiz();
     const ids = q.questions.map((x) => x.id);
-    const a = startExam(user("u-creator"), SLUG, q, "tab-a");
+    const a = begin(user("u-creator"), SLUG, q, "tab-a");
     expect([...a.order].sort()).toEqual([...ids].sort());
     for (const qq of q.questions) {
       const perm = a.optionOrder[qq.id];
@@ -72,7 +95,7 @@ describe("exam session store", () => {
       expect([...(perm ?? [])].sort()).toEqual(qq.options.map((_, i) => i));
     }
     examSessions.reset();
-    const b = startExam(user("u-creator"), SLUG, q, "tab-a");
+    const b = begin(user("u-creator"), SLUG, q, "tab-a");
     expect(b.order).toEqual(a.order);
     expect(b.optionOrder).toEqual(a.optionOrder);
   });
@@ -83,7 +106,7 @@ describe("exam session store", () => {
       ...base,
       proctor: { durationMinutes: 2, maxViolations: 3, requireFullscreen: false },
     };
-    const s = startExam(user("u-creator"), SLUG, q, "tab-a");
+    const s = begin(user("u-creator"), SLUG, q, "tab-a");
     expect(s.order).toEqual(q.questions.map((x) => x.id));
     for (const qq of q.questions) {
       expect(s.optionOrder[qq.id]).toEqual(qq.options.map((_, i) => i));
@@ -91,7 +114,7 @@ describe("exam session store", () => {
   });
 
   it("saveAnswer persists and getActiveSession returns it; undefined clears it", () => {
-    const s = startExam(user("u-creator"), SLUG, quiz(), "tab-a");
+    const s = begin(user("u-creator"), SLUG, quiz(), "tab-a");
     const key = sessionKey(SLUG, "u-creator");
     const qid = s.order[0]!;
     expect(saveAnswer(key, qid, 2)).toBe(true);
@@ -102,7 +125,7 @@ describe("exam session store", () => {
   });
 
   it("flags, current index, violations, heartbeat and claimTab update the session", () => {
-    const s = startExam(user("u-creator"), SLUG, quiz(), "tab-a");
+    const s = begin(user("u-creator"), SLUG, quiz(), "tab-a");
     const key = sessionKey(SLUG, "u-creator");
     const qid = s.order[1]!;
     toggleFlag(key, qid);
@@ -132,14 +155,14 @@ describe("exam session store", () => {
   });
 
   it("survives a cache clear (like a reload) with the same deadline", () => {
-    const s = startExam(user("u-creator"), SLUG, quiz(), "tab-a");
+    const s = begin(user("u-creator"), SLUG, quiz(), "tab-a");
     window.dispatchEvent(new StorageEvent("storage", { key: "jfet-exam-sessions-v1" }));
     expect(getActiveSession(SLUG, "u-creator")?.deadlineMs).toBe(s.deadlineMs);
   });
 
   it("finishExam stores an attempt with meta and deletes the session", () => {
     const q = quiz();
-    const s = startExam(user("u-creator"), SLUG, q, "tab-a");
+    const s = begin(user("u-creator"), SLUG, q, "tab-a");
     const key = sessionKey(SLUG, "u-creator");
     const first = q.questions[0]!;
     saveAnswer(key, first.id, first.correct);
@@ -171,7 +194,7 @@ describe("exam session store", () => {
 
   it("finalizeExpired submits only after the deadline", () => {
     const q = quiz();
-    const s = startExam(user("u-creator"), SLUG, q, "tab-a");
+    const s = begin(user("u-creator"), SLUG, q, "tab-a");
     expect(finalizeExpired(user("u-creator"), SLUG, q, s.deadlineMs - 1)).toBeNull();
     expect(getActiveSession(SLUG, "u-creator")).toBeDefined();
     const r = finalizeExpired(user("u-creator"), SLUG, q, s.deadlineMs + 1);
@@ -182,7 +205,7 @@ describe("exam session store", () => {
 
   it("reconcileOrder drops unknown ids and appends new ones", () => {
     const q = quiz();
-    const s = startExam(user("u-creator"), SLUG, q, "tab-a");
+    const s = begin(user("u-creator"), SLUG, q, "tab-a");
     const [a, b] = s.order;
     const stale = {
       ...s,
@@ -213,12 +236,57 @@ describe("exam session store", () => {
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("QuotaExceededError");
     });
-    const s = startExam(user("u-creator"), SLUG, quiz(), "tab-a");
+    const s = begin(user("u-creator"), SLUG, quiz(), "tab-a");
     expect(s.deadlineMs).toBe(T0 + 2 * 60_000);
     expect(getActiveSession(SLUG, "u-creator")?.deadlineMs).toBe(s.deadlineMs);
     const key = sessionKey(SLUG, "u-creator");
     expect(saveAnswer(key, s.order[0]!, 1)).toBe(false);
     // the in-memory session still has the answer
     expect(getActiveSession(SLUG, "u-creator")?.answers[s.order[0]!]).toBe(1);
+  });
+
+  it("refuses a NEW session when no attempts are left, but still resumes one", () => {
+    useAllAttempts();
+    expect(startExam(user("u-creator"), SLUG, quiz(), "tab-a")).toBe(NO_ATTEMPTS_LEFT);
+    expect(getActiveSession(SLUG, "u-creator")).toBeUndefined();
+
+    platform.reset();
+    const s = begin(user("u-creator"), SLUG, quiz(), "tab-a");
+    useAllAttempts();
+    expect(startExam(user("u-creator"), SLUG, quiz(), "tab-b")).toEqual(s);
+  });
+
+  it("rejects answer, flag and violation writes after the deadline", () => {
+    const s = begin(user("u-creator"), SLUG, quiz(), "tab-a");
+    const key = sessionKey(SLUG, "u-creator");
+    const qid = s.order[0]!;
+    vi.setSystemTime(s.deadlineMs);
+    expect(saveAnswer(key, qid, 1)).toBe(true); // at the deadline is still allowed
+    vi.setSystemTime(s.deadlineMs + 1);
+    expect(saveAnswer(key, qid, 2)).toBe(false);
+    expect(toggleFlag(key, qid)).toBe(false);
+    expect(recordViolation(key, { type: "window_blur", at: "x", counted: true })).toBe(false);
+    const after = getActiveSession(SLUG, "u-creator")!;
+    expect(after.answers[qid]).toBe(1);
+    expect(after.flagged).toEqual([]);
+    expect(after.violations).toEqual([]);
+  });
+
+  it("re-reads storage before writing: a stale tab neither steals ownership nor wipes answers", () => {
+    const s = begin(user("u-creator"), SLUG, quiz(), "tab-a");
+    const key = sessionKey(SLUG, "u-creator");
+    const [q1, q2] = s.order;
+    // Another tab took over and answered q1; its `storage` event has not reached us yet.
+    const other = { ...stored()[key]!, tabId: "tab-b", lastBeat: T0 + 1000, answers: { [q1!]: 3 } };
+    localStorage.setItem(KEY, JSON.stringify({ [key]: other }));
+    vi.setSystemTime(T0 + 5000);
+
+    expect(heartbeat(key, "tab-a")).toBe(false);
+    expect(stored()[key]?.tabId).toBe("tab-b");
+    expect(stored()[key]?.lastBeat).toBe(T0 + 1000);
+
+    expect(saveAnswer(key, q2!, 0)).toBe(true);
+    expect(stored()[key]?.tabId).toBe("tab-b");
+    expect(stored()[key]?.answers).toEqual({ [q1!]: 3, [q2!]: 0 });
   });
 });

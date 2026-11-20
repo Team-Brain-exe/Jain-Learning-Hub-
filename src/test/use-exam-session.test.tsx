@@ -59,7 +59,11 @@ describe("useExamSession", () => {
     doc.exitFullscreen = vi.fn().mockResolvedValue(undefined);
   });
   afterEach(() => {
+    vi.restoreAllMocks();
     delete root.requestFullscreen;
+    delete doc.exitFullscreen;
+    Reflect.deleteProperty(document, "visibilityState");
+    Reflect.deleteProperty(document, "fullscreenElement");
     vi.useRealTimers();
   });
 
@@ -120,7 +124,7 @@ describe("useExamSession", () => {
     act(() => vi.advanceTimersByTime(2000));
     act(() => hideTab());
     act(() => {
-      vi.setSystemTime(T0 + 2 * 60_000 + 1);
+      vi.setSystemTime(T0 + 2 * 60_000); // still writable; the next countdown tick expires it
       hideTab();
       vi.advanceTimersByTime(300);
     });
@@ -200,7 +204,6 @@ describe("useExamSession", () => {
     act(() => result.current.answer(first, 0));
     expect(result.current.saveState).toBe("failed");
     expect(result.current.phase).toBe("active");
-    vi.restoreAllMocks();
   });
 
   it("a fresh hook resumes active with the same deadline", async () => {
@@ -282,5 +285,106 @@ describe("useExamSession", () => {
     });
     expect(late.result.current.phase).toBe("finished");
     expect(platform.get().attempts.filter((a) => a.userId === "u-creator")).toHaveLength(2);
+  });
+
+  it("(a) after a failed finish, a new session taken over still counts violations and expires", async () => {
+    const b = render();
+    await act(async () => {
+      await b.result.current.start();
+    });
+    platform.update((st) => ({
+      ...st,
+      attempts: [1, 2, 3].map((i) => ({
+        id: `at-${i}`,
+        userId: "u-creator",
+        slug: SLUG,
+        at: "x",
+        score: 0,
+        passed: false,
+        answers: {},
+      })),
+    }));
+    act(() => b.result.current.submit());
+    expect(b.result.current.error).toMatch(/attempts/);
+    expect(b.result.current.phase).toBe("intro");
+
+    platform.reset();
+    act(() => vi.advanceTimersByTime(1000));
+    const a = render();
+    await act(async () => {
+      await a.result.current.start();
+    });
+    expect(b.result.current.otherTabActive).toBe(true);
+    act(() => b.result.current.takeOver());
+    act(() => hideTab());
+    expect(b.result.current.counted).toBe(1);
+    expect(b.result.current.warning?.n).toBe(1);
+    act(() => vi.advanceTimersByTime(2 * 60_000));
+    expect(b.result.current.phase).toBe("finished");
+    expect(b.result.current.result?.attempt.meta?.autoSubmitReason).toBe("timeout");
+    expect(platform.get().attempts.filter((x) => x.userId === "u-creator")).toHaveLength(1);
+  });
+
+  it("(b) two instances on one session at the deadline store exactly one attempt", async () => {
+    const a = render();
+    await act(async () => {
+      await a.result.current.start();
+    });
+    const b = render();
+    expect(b.result.current.otherTabActive).toBe(true);
+    vi.mocked(proctoring.finishExam).mockClear();
+    act(() => vi.advanceTimersByTime(2 * 60_000 + 500));
+    expect(proctoring.finishExam).toHaveBeenCalledTimes(1);
+    expect(a.result.current.phase).toBe("finished");
+    expect(platform.get().attempts.filter((x) => x.userId === "u-creator")).toHaveLength(1);
+  });
+
+  it("(c) start() with no attempts left sets error and stays in intro", async () => {
+    platform.update((st) => ({
+      ...st,
+      attempts: [1, 2, 3].map((i) => ({
+        id: `at-${i}`,
+        userId: "u-creator",
+        slug: SLUG,
+        at: "x",
+        score: 0,
+        passed: false,
+        answers: {},
+      })),
+    }));
+    const { result } = render();
+    await act(async () => {
+      await result.current.start();
+    });
+    expect(result.current.phase).toBe("intro");
+    expect(result.current.error).toMatch(/attempts/);
+    expect(getActiveSession(SLUG, "u-creator")).toBeUndefined();
+  });
+
+  it("(d) answers after the deadline are rejected", async () => {
+    const { result } = render();
+    await act(async () => {
+      await result.current.start();
+    });
+    const first = result.current.session!.order[0]!;
+    vi.setSystemTime(T0 + 2 * 60_000 + 1);
+    act(() => result.current.answer(first, 1));
+    expect(result.current.saveState).toBe("failed");
+    expect(getActiveSession(SLUG, "u-creator")?.answers[first]).toBeUndefined();
+  });
+
+  it("(e) double start() without fullscreen support logs one fullscreen_unsupported", async () => {
+    delete root.requestFullscreen;
+    const { result } = render();
+    await act(async () => {
+      await Promise.all([result.current.start(), result.current.start()]);
+    });
+    await act(async () => {
+      await result.current.start();
+    });
+    const entries = result.current.session?.violations.filter(
+      (v) => v.type === "fullscreen_unsupported",
+    );
+    expect(entries).toHaveLength(1);
   });
 });
