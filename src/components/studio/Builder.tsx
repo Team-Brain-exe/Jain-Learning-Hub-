@@ -2,6 +2,7 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { categories } from "@/data/courses";
 import { newLesson, newModule, newQuestion, type LessonDraft, type ModuleDraft, type Quiz, type Submission, updateSubmission } from "@/data/platform";
 import { btnGhost, btnOutline, card, Field, input } from "./ui";
+import { ExamModeSettings, ExamOptions, ExamQuestionFields } from "./ExamModeSettings";
 
 const move = <T,>(arr: T[], i: number, d: -1 | 1): T[] => {
   const j = i + d;
@@ -104,18 +105,25 @@ export function QuizTab({ sub, defaultPass }: { sub: Submission; defaultPass: nu
   const quiz: Quiz = sub.quiz ?? { passMark: defaultPass, maxAttempts: 3, questions: [] };
   const setQuiz = (p: Partial<Quiz>) => updateSubmission(sub.id, { quiz: { ...quiz, ...p } });
   const patchQ = (i: number, p: Partial<Quiz["questions"][number]>) => setQuiz({ questions: quiz.questions.map((q, j) => (j === i ? { ...q, ...p } : q)) });
+  const putQ = (i: number, next: Quiz["questions"][number]) =>
+    setQuiz({ questions: quiz.questions.map((q, j) => (j === i ? next : q)) });
   return (
     <div className="space-y-6">
       <div className="grid max-w-md grid-cols-2 gap-4">
         <Field label="Pass mark (%)"><input type="number" min={1} max={100} className={input} value={quiz.passMark} onChange={(e) => setQuiz({ passMark: Math.min(100, Math.max(1, Number(e.target.value) || 1)) })} /></Field>
         <Field label="Max attempts"><input type="number" min={1} max={10} className={input} value={quiz.maxAttempts} onChange={(e) => setQuiz({ maxAttempts: Math.min(10, Math.max(1, Number(e.target.value) || 1)) })} /></Field>
       </div>
+      <ExamModeSettings quiz={quiz} setQuiz={setQuiz} />
       {quiz.questions.map((q, qi) => (
         <section key={q.id} className={card}>
           <div className="flex items-start gap-3">
             <div className="flex-1"><Field label={`Question ${qi + 1}`}><textarea rows={2} className={input} value={q.prompt} onChange={(e) => patchQ(qi, { prompt: e.target.value })} /></Field></div>
             <button type="button" aria-label="Delete question" className={btnGhost} onClick={() => setQuiz({ questions: quiz.questions.filter((_, j) => j !== qi) })}><Trash2 className="h-4 w-4 text-destructive" /></button>
           </div>
+          {quiz.proctor && <ExamQuestionFields q={q} onChange={(next) => putQ(qi, next)} />}
+          {quiz.proctor && (q.type === "multi" || q.type === "truefalse") ? (
+            <ExamOptions q={q} onChange={(next) => putQ(qi, next)} />
+          ) : <>
           <div className="mt-3 space-y-2" role="radiogroup" aria-label="Options (select the correct one)">
             {q.options.map((o, oi) => (
               <div key={oi} className="flex items-center gap-2">
@@ -125,6 +133,7 @@ export function QuizTab({ sub, defaultPass }: { sub: Submission; defaultPass: nu
             ))}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">Select the radio next to the correct answer.</p>
+          </>}
           <div className="mt-3"><Field label="Explanation"><input className={input} value={q.explanation} onChange={(e) => patchQ(qi, { explanation: e.target.value })} /></Field></div>
         </section>
       ))}

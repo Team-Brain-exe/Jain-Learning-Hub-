@@ -1,11 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { findCourse, getQuiz, scoreQuiz, submitAttempt, usePlatform } from "@/data/platform";
 import { useAuth } from "@/hooks/use-auth";
 import { useEnrollments } from "@/hooks/use-enrollment";
 import { btn, btnOutline, card, Empty, fmtDateTime, RequireRole } from "@/components/studio/ui";
+import { ExamEntryCard } from "@/components/proctor/ExamEntryCard";
+import type { Quiz, QuizAttempt } from "@/data/platform";
+import { effectiveMinutes, examSessions, finalizeExpired, sessionKey } from "@/data/proctoring";
 
 export const Route = createFileRoute("/learn/$slug/quiz")({
   head: () => ({ meta: [{ title: "Course assessment — JAIN FET Learning Hub" }, { name: "robots", content: "noindex" }] }),
@@ -28,6 +31,9 @@ function QuizPage() {
 
   const mine = state.attempts.filter((a) => a.userId === user!.id && a.slug === slug);
   const left = quiz.maxAttempts - mine.length;
+  if (quiz.proctor) {
+    return <ProctoredQuiz slug={slug} title={course.title} quiz={quiz} mine={mine} left={left} />;
+  }
   const complete = quiz.questions.every((q) => answers[q.id] !== undefined);
 
   const submit = () => {
@@ -84,6 +90,85 @@ function QuizPage() {
           <h2 className="font-bold">Attempt history</h2>
           <ul className="mt-3 divide-y divide-border rounded-lg border border-border bg-card text-sm">
             {mine.map((a) => <li key={a.id} className="flex justify-between px-4 py-2"><span>{fmtDateTime(a.at)}</span><span className={a.passed ? "font-semibold text-success" : "text-muted-foreground"}>{a.score}% {a.passed ? "· passed" : ""}</span></li>)}
+          </ul>
+        </section>
+      )}
+    </div>
+  );
+}
+
+/** Proctored assessments: an entry card that opens the exam in its own tab, plus history. */
+function ProctoredQuiz({
+  slug,
+  title,
+  quiz,
+  mine,
+  left,
+}: {
+  slug: string;
+  title: string;
+  quiz: Quiz;
+  mine: QuizAttempt[];
+  left: number;
+}) {
+  const { user } = useAuth();
+
+  // Close out an exam whose deadline passed while its tab was closed.
+  useEffect(() => {
+    if (user) finalizeExpired(user, slug, quiz);
+  }, [user, slug, quiz]);
+
+  const minutes = quiz.proctor ? effectiveMinutes(quiz.proctor, user?.timeMultiplier ?? 1) : 0;
+  // Subscribed, so the label flips to "Resume exam" while the exam tab runs (server snapshot: {}).
+  const sessions = examSessions.use();
+  const active = !!user && !!sessions[sessionKey(slug, user.id)];
+
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      <Link to="/my-learning" className="text-sm font-semibold text-primary">
+        ← My Learning
+      </Link>
+      <h1 className="mt-3 text-3xl font-extrabold tracking-tight">{title}: Final assessment</h1>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {quiz.questions.length} questions · pass mark {quiz.passMark}% ·{" "}
+        {left > 0 ? `${left} of ${quiz.maxAttempts} attempts left` : "no attempts left"}
+      </p>
+
+      <ExamEntryCard
+        quiz={quiz}
+        slug={slug}
+        attemptsLeft={left}
+        maxAttempts={quiz.maxAttempts}
+        hasActiveSession={active}
+        minutes={minutes}
+        requireFullscreen={quiz.proctor?.requireFullscreen ?? true}
+      />
+
+      {mine.length > 0 && (
+        <section className="mt-10">
+          <h2 className="font-bold">Attempt history</h2>
+          <ul className="mt-3 divide-y divide-border rounded-lg border border-border bg-card text-sm">
+            {mine.map((a) => {
+              const n = a.meta?.violations.filter((v) => v.counted).length ?? 0;
+              return (
+                <li key={a.id} className="flex items-center justify-between gap-3 px-4 py-2">
+                  <span>{fmtDateTime(a.at)}</span>
+                  <span className="flex items-center gap-2">
+                    {n > 0 && (
+                      <span className="rounded bg-warning/15 px-1.5 text-xs font-semibold text-warning">
+                        <span aria-hidden="true">⚠ {n}</span>
+                        <span className="sr-only">{n} warnings</span>
+                      </span>
+                    )}
+                    <span
+                      className={a.passed ? "font-semibold text-success" : "text-muted-foreground"}
+                    >
+                      {a.score}% {a.passed ? "· passed" : ""}
+                    </span>
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}

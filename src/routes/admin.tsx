@@ -3,6 +3,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { archiveSubmission, assignReviewer, decideCertificate, publishSubmission, resetDemoData, setUserRole, updatePolicy, usePlatform, type Policy, type Role } from "@/data/platform";
 import { useAuth } from "@/hooks/use-auth";
+import { ProctoredAttemptsTable } from "@/components/proctor/ProctoredAttemptsTable";
 import { btn, btnGhost, btnOutline, card, Empty, fmtDateTime, input, PageHeader, RequireRole, StatusBadge } from "@/components/studio/ui";
 
 export const Route = createFileRoute("/admin")({
@@ -36,6 +37,7 @@ function Admin() {
               {stat("Published (creator)", s.submissions.filter((x) => x.status === "published").length)}{stat("Certificates issued", s.certificates.filter((c) => c.status === "issued").length)}{stat("Pending certificates", pendingCerts.length)}{stat("Quiz attempts", s.attempts.length)}
             </div>
             <button className={btnOutline} onClick={() => { if (confirm("Reset ALL demo data in this browser?")) { resetDemoData(); toast.success("Demo data reset"); } }}>Reset demo data</button>
+            <ProctoredAttemptsTable attempts={s.attempts} users={s.users} />
           </div>
         )}
 
