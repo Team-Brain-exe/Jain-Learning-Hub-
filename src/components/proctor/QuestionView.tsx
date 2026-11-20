@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { Flag } from "lucide-react";
+import { Flag, XCircle } from "lucide-react";
 
 import { btn, btnOutline, card } from "@/components/studio/ui";
 import type { QuizQuestion } from "@/data/platform";
@@ -21,6 +21,8 @@ export interface QuestionViewProps {
   readOnly?: boolean;
   /** Hide the footer prev/next buttons (the shell renders its own bar). */
   hideNav?: boolean;
+  /** Review mode: ORIGINAL indices of the correct options, highlighted; wrong picks are marked. */
+  correctOriginal?: number[];
 }
 
 export function QuestionView({
@@ -36,6 +38,7 @@ export function QuestionView({
   onNext,
   readOnly = false,
   hideNav = false,
+  correctOriginal,
 }: QuestionViewProps) {
   const promptId = useId();
   const name = useId();
@@ -106,6 +109,8 @@ export function QuestionView({
       <div role={multi ? "group" : "radiogroup"} aria-labelledby={promptId} className="space-y-2">
         {optionOrder.map((original, display) => {
           const checked = selected.includes(original);
+          const isCorrectOpt = correctOriginal?.includes(original) ?? false;
+          const wrongPick = correctOriginal !== undefined && checked && !isCorrectOpt;
           return (
             <label
               key={original}
@@ -113,6 +118,8 @@ export function QuestionView({
                 "flex w-full cursor-pointer items-center gap-3 rounded-lg border border-border px-4 py-3 text-sm transition hover:bg-accent",
                 checked && "border-2 border-primary bg-secondary",
                 readOnly && "cursor-default",
+                isCorrectOpt && "border-success bg-success/10",
+                wrongPick && "text-destructive",
               )}
             >
               <input
@@ -124,6 +131,7 @@ export function QuestionView({
                 className="h-4 w-4 accent-primary"
               />
               <span className="flex-1 select-none">{question.options[original]}</span>
+              {wrongPick && <XCircle className="h-4 w-4 shrink-0" aria-label="Your answer" />}
               <kbd
                 aria-hidden="true"
                 className="hidden rounded sm:inline-block border border-border bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"

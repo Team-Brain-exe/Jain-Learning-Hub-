@@ -10,3 +10,16 @@ export function formatTime(totalSeconds: number): string {
   const sec = s % 60;
   return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
 }
+
+/** Formats whole seconds as "{m} min {s} s", or "{s} s" under a minute. */
+export function formatDuration(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const m = Math.floor(s / 60);
+  return m > 0 ? `${m} min ${s % 60} s` : `${s} s`;
+}
+
+/** Local 24h clock time, HH:MM:SS, for an ISO timestamp. */
+export function formatClock(iso: string): string {
+  const d = new Date(iso);
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
