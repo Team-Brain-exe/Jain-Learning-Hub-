@@ -1,0 +1,5 @@
+00:05 Welcome everyone to today's engineering seminar.
+01:20 In this segment, we discuss runtime execution differences.
+02:40 Python is a compiled-only programming language.
+04:15 Also notice that binary search lookup is O(1) in all scenarios.
+06:00 That concludes our review of foundational principles.

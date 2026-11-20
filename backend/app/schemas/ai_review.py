@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
+import json
 from app.models.ai_review import AIJobStatus, FindingSeverity, FindingType
 from app.models.course import CourseLifecycleStatus
 
@@ -8,14 +9,26 @@ class AIFindingSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    asset_id: Optional[str]
+    asset_id: Optional[str] = None
     finding_type: FindingType
     severity: FindingSeverity
     claim: str
-    source_location: Optional[str]
+    source_location: Optional[str] = None
+    conflicting_location: Optional[str] = None
     explanation: str
-    suggested_correction: Optional[str]
+    suggested_correction: Optional[str] = None
+    references_json: Optional[str] = None
+    confidence: Optional[float] = None
     requires_human_review: bool
+
+    @property
+    def references(self) -> List[Dict[str, Any]]:
+        if self.references_json:
+            try:
+                return json.loads(self.references_json)
+            except Exception:
+                return []
+        return []
 
 class AIReviewJobResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -23,8 +36,11 @@ class AIReviewJobResponse(BaseModel):
     id: str
     course_id: str
     status: AIJobStatus
-    summary: Optional[str]
-    error_message: Optional[str]
+    summary: Optional[str] = None
+    error_message: Optional[str] = None
+    transcripts_json: Optional[str] = None
+    total_segments: Optional[int] = 0
+    total_claims: Optional[int] = 0
     created_at: datetime
     updated_at: datetime
     findings: List[AIFindingSchema] = []
