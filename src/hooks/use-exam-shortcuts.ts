@@ -35,15 +35,16 @@ export function useExamShortcuts(opts: Options): void {
     const handler = (e: KeyboardEvent) => {
       const o = ref.current;
       if (!o.enabled) return;
-      if (e.repeat) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (isTypingTarget(e.target)) return;
+      if (e.repeat && e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
       if (/^[1-9]$/.test(e.key)) {
         const idx = Number(e.key) - 1;
         if (idx < o.optionCount) o.onPick(idx);
       } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-        // Stop a focused radio from moving its selection natively.
+        // Stop a focused radio from moving its selection natively, repeats included.
         e.preventDefault();
+        if (e.repeat) return;
         if (e.key === "ArrowLeft") o.onPrev();
         else o.onNext();
       } else if (e.key === "f" || e.key === "F") o.onFlag();

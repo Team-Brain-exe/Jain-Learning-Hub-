@@ -124,6 +124,23 @@ describe("useExamShortcuts", () => {
     expect(h.onNext).toHaveBeenCalledTimes(1);
   });
 
+  it("cancels repeated arrows on a focused radio without navigating", () => {
+    const h = setup();
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    document.body.appendChild(radio);
+    const ev = new KeyboardEvent("keydown", {
+      key: "ArrowRight",
+      repeat: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    radio.dispatchEvent(ev);
+    radio.remove();
+    expect(ev.defaultPrevented).toBe(true);
+    expect(h.onNext).not.toHaveBeenCalled();
+  });
+
   it("ignores key repeats", () => {
     const h = setup();
     fireEvent.keyDown(window, { key: "f", repeat: true });
