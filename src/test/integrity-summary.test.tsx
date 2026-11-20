@@ -51,8 +51,18 @@ describe("IntegritySummary", () => {
         })}
       />,
     );
-    expect(screen.getByText(/You left the exam tab\. at 09:05:07/)).toBeTruthy();
-    expect(screen.getByText(/The exam window lost focus\. at 09:05:07/)).toBeTruthy();
+    expect(
+      screen.getByText(
+        (_, el) => el?.tagName === "LI" && el.textContent === "09:05:07 · You left the exam tab.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        (_, el) =>
+          el?.tagName === "LI" &&
+          el.textContent === "09:05:07 · The exam window lost focus.(not counted)",
+      ),
+    ).toBeTruthy();
     expect(screen.getAllByText("(not counted)")).toHaveLength(1);
     expect(screen.getByText("1").className).toContain("text-warning");
     expect(screen.queryByText("No integrity issues recorded.")).toBeNull();

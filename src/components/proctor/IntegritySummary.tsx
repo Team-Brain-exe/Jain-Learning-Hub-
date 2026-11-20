@@ -33,7 +33,7 @@ export function IntegritySummary({ meta }: { meta: AttemptMeta }) {
         <ul className="space-y-1 border-t border-border pt-3 text-sm">
           {meta.violations.map((v, i) => (
             <li key={`${v.at}-${i}`}>
-              {TYPE_LABEL[v.type]} at {formatClock(v.at)}
+              <span className="tabular-nums">{formatClock(v.at)}</span> · {TYPE_LABEL[v.type]}
               {!v.counted && <span className="ml-1 text-muted-foreground">(not counted)</span>}
             </li>
           ))}

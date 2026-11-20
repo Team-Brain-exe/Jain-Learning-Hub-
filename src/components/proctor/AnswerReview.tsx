@@ -56,6 +56,9 @@ export function AnswerReview({ quiz, order, optionOrder, answers }: AnswerReview
         onPrev={() => setI(Math.max(0, idx - 1))}
         onNext={() => setI(Math.min(entries.length - 1, idx + 1))}
         readOnly
+        nextLabel="Next →"
+        canPrev={idx > 0}
+        canNext={idx < entries.length - 1}
         correctOriginal={correctOriginal}
       />
       {question.explanation && (

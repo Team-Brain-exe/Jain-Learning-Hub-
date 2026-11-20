@@ -89,9 +89,25 @@ describe("AnswerReview", () => {
     render(<AnswerReview quiz={quiz} order={order} optionOrder={optionOrder} answers={answers} />);
     expect(screen.getByText("✓ Correct")).toBeTruthy();
     expect(screen.getByText("Because A.")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Save/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Next/ }));
     expect(screen.getByText("✕ Wrong")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Save/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Next/ }));
     expect(screen.getByText("Skipped")).toBeTruthy();
+  });
+
+  it("disables prev/next at the ends and says Next", () => {
+    render(<AnswerReview quiz={quiz} order={order} optionOrder={optionOrder} answers={answers} />);
+    expect(screen.getByRole("button", { name: /Previous|Prev/ })).toHaveProperty("disabled", true);
+    fireEvent.click(screen.getByRole("button", { name: /Next/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Next/ }));
+    expect(screen.getByRole("button", { name: /Next/ })).toHaveProperty("disabled", true);
+  });
+
+  it("highlights the correct option and marks a wrong pick", () => {
+    render(<AnswerReview quiz={quiz} order={order} optionOrder={optionOrder} answers={answers} />);
+    fireEvent.click(screen.getByRole("button", { name: /Next/ }));
+    expect(screen.getByText("Alpha").closest("label")?.className).toContain("border-success");
+    expect(screen.getByLabelText("Your answer")).toBeTruthy();
+    expect(screen.getByText("Gamma").closest("label")?.className).toContain("text-destructive");
   });
 });

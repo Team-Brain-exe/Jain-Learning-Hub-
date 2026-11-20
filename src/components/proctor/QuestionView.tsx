@@ -23,6 +23,11 @@ export interface QuestionViewProps {
   hideNav?: boolean;
   /** Review mode: ORIGINAL indices of the correct options, highlighted; wrong picks are marked. */
   correctOriginal?: number[];
+  /** Disable the Previous / Next buttons (default true = enabled). */
+  canPrev?: boolean;
+  canNext?: boolean;
+  /** Label of the next button (default "Save & next →"). */
+  nextLabel?: string;
 }
 
 export function QuestionView({
@@ -39,6 +44,9 @@ export function QuestionView({
   readOnly = false,
   hideNav = false,
   correctOriginal,
+  canPrev = true,
+  canNext = true,
+  nextLabel = "Save & next →",
 }: QuestionViewProps) {
   const promptId = useId();
   const name = useId();
@@ -151,6 +159,7 @@ export function QuestionView({
             type="button"
             className={cn(btnOutline, "whitespace-nowrap px-3 sm:px-5")}
             onClick={onPrev}
+            disabled={!canPrev}
           >
             ←<span className="sm:hidden">Prev</span>
             <span className="hidden sm:inline">Previous</span>
@@ -172,8 +181,9 @@ export function QuestionView({
             type="button"
             className={cn(btn, "whitespace-nowrap px-3 sm:px-5")}
             onClick={onNext}
+            disabled={!canNext}
           >
-            Save &amp; next →
+            {nextLabel}
           </button>
         )}
       </div>
