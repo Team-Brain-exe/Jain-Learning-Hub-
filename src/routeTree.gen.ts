@@ -27,6 +27,7 @@ import { Route as VerifyIndexRouteImport } from './routes/verify.index'
 import { Route as VerifyCertificateIdRouteImport } from './routes/verify.$certificateId'
 import { Route as FacultyReviewIdRouteImport } from './routes/faculty.review.$id'
 import { Route as LearnSlugLessonIdRouteImport } from './routes/learn.$slug.$lessonId'
+import { Route as LearnSlugExamRouteImport } from './routes/learn.$slug.exam'
 import { Route as LearnSlugQuizRouteImport } from './routes/learn.$slug.quiz'
 
 const IndexRoute = IndexRouteImport.update({
@@ -119,6 +120,11 @@ const LearnSlugLessonIdRoute = LearnSlugLessonIdRouteImport.update({
   path: '/learn/$slug/$lessonId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LearnSlugExamRoute = LearnSlugExamRouteImport.update({
+  id: '/learn/$slug/exam',
+  path: '/learn/$slug/exam',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LearnSlugQuizRoute = LearnSlugQuizRouteImport.update({
   id: '/learn/$slug/quiz',
   path: '/learn/$slug/quiz',
@@ -144,6 +150,7 @@ export interface FileRoutesByFullPath {
   '/verify/': typeof VerifyIndexRoute
   '/faculty/review/$id': typeof FacultyReviewIdRoute
   '/learn/$slug/$lessonId': typeof LearnSlugLessonIdRoute
+  '/learn/$slug/exam': typeof LearnSlugExamRoute
   '/learn/$slug/quiz': typeof LearnSlugQuizRoute
 }
 export interface FileRoutesByTo {
@@ -165,6 +172,7 @@ export interface FileRoutesByTo {
   '/verify': typeof VerifyIndexRoute
   '/faculty/review/$id': typeof FacultyReviewIdRoute
   '/learn/$slug/$lessonId': typeof LearnSlugLessonIdRoute
+  '/learn/$slug/exam': typeof LearnSlugExamRoute
   '/learn/$slug/quiz': typeof LearnSlugQuizRoute
 }
 export interface FileRoutesById {
@@ -187,6 +195,7 @@ export interface FileRoutesById {
   '/verify/': typeof VerifyIndexRoute
   '/faculty/review/$id': typeof FacultyReviewIdRoute
   '/learn/$slug/$lessonId': typeof LearnSlugLessonIdRoute
+  '/learn/$slug/exam': typeof LearnSlugExamRoute
   '/learn/$slug/quiz': typeof LearnSlugQuizRoute
 }
 export interface FileRouteTypes {
@@ -210,6 +219,7 @@ export interface FileRouteTypes {
     | '/verify/'
     | '/faculty/review/$id'
     | '/learn/$slug/$lessonId'
+    | '/learn/$slug/exam'
     | '/learn/$slug/quiz'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -231,6 +241,7 @@ export interface FileRouteTypes {
     | '/verify'
     | '/faculty/review/$id'
     | '/learn/$slug/$lessonId'
+    | '/learn/$slug/exam'
     | '/learn/$slug/quiz'
   id:
     | '__root__'
@@ -252,6 +263,7 @@ export interface FileRouteTypes {
     | '/verify/'
     | '/faculty/review/$id'
     | '/learn/$slug/$lessonId'
+    | '/learn/$slug/exam'
     | '/learn/$slug/quiz'
   fileRoutesById: FileRoutesById
 }
@@ -274,6 +286,7 @@ export interface RootRouteChildren {
   VerifyIndexRoute: typeof VerifyIndexRoute
   FacultyReviewIdRoute: typeof FacultyReviewIdRoute
   LearnSlugLessonIdRoute: typeof LearnSlugLessonIdRoute
+  LearnSlugExamRoute: typeof LearnSlugExamRoute
   LearnSlugQuizRoute: typeof LearnSlugQuizRoute
 }
 
@@ -405,6 +418,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LearnSlugLessonIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/learn/$slug/exam': {
+      id: '/learn/$slug/exam'
+      path: '/learn/$slug/exam'
+      fullPath: '/learn/$slug/exam'
+      preLoaderRoute: typeof LearnSlugExamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/learn/$slug/quiz': {
       id: '/learn/$slug/quiz'
       path: '/learn/$slug/quiz'
@@ -434,6 +454,7 @@ const rootRouteChildren: RootRouteChildren = {
   VerifyIndexRoute: VerifyIndexRoute,
   FacultyReviewIdRoute: FacultyReviewIdRoute,
   LearnSlugLessonIdRoute: LearnSlugLessonIdRoute,
+  LearnSlugExamRoute: LearnSlugExamRoute,
   LearnSlugQuizRoute: LearnSlugQuizRoute,
 }
 export const routeTree = rootRouteImport
