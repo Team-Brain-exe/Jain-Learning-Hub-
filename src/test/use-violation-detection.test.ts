@@ -97,4 +97,48 @@ describe("useViolationDetection", () => {
     document.dispatchEvent(new Event("fullscreenchange"));
     expect(onViolation).toHaveBeenCalledWith("fullscreen_exit");
   });
+
+  it("keeps the debounce window when props change between events", () => {
+    const onViolation = vi.fn();
+    const { rerender } = renderHook(
+      (props: { watchFullscreen: boolean }) =>
+        useViolationDetection({ active: true, onViolation, ...props }),
+      { initialProps: { watchFullscreen: false } },
+    );
+    setHidden(true);
+    document.dispatchEvent(new Event("visibilitychange"));
+    rerender({ watchFullscreen: true });
+    vi.advanceTimersByTime(50);
+    window.dispatchEvent(new Event("blur"));
+    expect(onViolation).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports cut and paste as copy_paste and prevents default", () => {
+    for (const name of ["cut", "paste"]) {
+      const onViolation = vi.fn();
+      const { unmount } = renderHook(() =>
+        useViolationDetection({ active: true, watchFullscreen: false, onViolation }),
+      );
+      const e = new Event(name, { cancelable: true });
+      document.dispatchEvent(e);
+      expect(onViolation).toHaveBeenCalledWith("copy_paste");
+      expect(e.defaultPrevented).toBe(true);
+      unmount();
+    }
+  });
+
+  it("ignores visibilitychange to visible", () => {
+    const onViolation = vi.fn();
+    renderHook(() => useViolationDetection({ active: true, watchFullscreen: false, onViolation }));
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(onViolation).not.toHaveBeenCalled();
+  });
+
+  it("ignores fullscreenchange while an element is fullscreen", () => {
+    const onViolation = vi.fn();
+    renderHook(() => useViolationDetection({ active: true, watchFullscreen: true, onViolation }));
+    setFullscreenElement(document.body);
+    document.dispatchEvent(new Event("fullscreenchange"));
+    expect(onViolation).not.toHaveBeenCalled();
+  });
 });

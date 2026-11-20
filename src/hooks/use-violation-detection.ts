@@ -15,14 +15,15 @@ export function useViolationDetection({ active, watchFullscreen, onViolation }: 
     callbackRef.current = onViolation;
   }, [onViolation]);
 
+  const lastReportedRef = useRef(Number.NEGATIVE_INFINITY);
+
   useEffect(() => {
     if (!active) return;
-    let lastReported = Number.NEGATIVE_INFINITY;
 
     const report = (type: ViolationType) => {
       const now = Date.now();
-      if (now - lastReported < DEBOUNCE_MS) return;
-      lastReported = now;
+      if (now - lastReportedRef.current < DEBOUNCE_MS) return;
+      lastReportedRef.current = now;
       callbackRef.current(type);
     };
 
