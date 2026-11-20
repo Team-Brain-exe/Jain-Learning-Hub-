@@ -23,3 +23,12 @@ export function formatClock(iso: string): string {
   const d = new Date(iso);
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
+
+/** "+mm:ss" offset of `atIso` from `startIso` (clamped at zero). */
+export function formatOffset(startIso: string, atIso: string): string {
+  const s = Math.max(
+    0,
+    Math.floor((new Date(atIso).getTime() - new Date(startIso).getTime()) / 1000),
+  );
+  return `+${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
+}
