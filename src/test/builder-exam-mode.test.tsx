@@ -96,6 +96,18 @@ describe("QuizTab exam mode", () => {
     expect("correctAll" in out.questions[0]).toBe(false);
   });
 
+  it("multi: warns inline when no correct option is ticked", () => {
+    render(<Harness initial={mk({ passMark: 70, maxAttempts: 3, proctor, questions: [q()] })} />);
+    fireEvent.click(screen.getByRole("combobox", { name: /Question type/ }));
+    fireEvent.click(screen.getByRole("option", { name: "Multiple choice" }));
+    expect(screen.queryByText("Tick at least one correct answer.")).toBeNull();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Option 1 is correct" }));
+    expect(lastQuiz().questions[0].correctAll).toEqual([]);
+    expect(screen.getByText("Tick at least one correct answer.")).toHaveClass("text-destructive");
+    fireEvent.click(screen.getByRole("checkbox", { name: "Option 2 is correct" }));
+    expect(screen.queryByText("Tick at least one correct answer.")).toBeNull();
+  });
+
   it("true/false fixes options and hides option editors", () => {
     render(<Harness initial={mk({ passMark: 70, maxAttempts: 3, proctor, questions: [q()] })} />);
     fireEvent.click(screen.getByRole("combobox", { name: /Question type/ }));

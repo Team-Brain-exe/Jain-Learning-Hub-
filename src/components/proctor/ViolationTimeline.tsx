@@ -1,4 +1,4 @@
-import { TYPE_LABEL, type Violation } from "@/data/proctoring";
+import { ADMIN_TYPE_LABEL, type Violation } from "@/data/proctoring";
 import { formatOffset } from "@/lib/format-time";
 
 interface Props {
@@ -17,7 +17,7 @@ export function ViolationTimeline({ violations, startedAt }: Props) {
         <li key={`${v.at}-${i}`} className="flex flex-wrap gap-x-2">
           <span className="font-mono tabular-nums">{formatOffset(startedAt, v.at)}</span>
           <span aria-hidden="true">·</span>
-          <span>{TYPE_LABEL[v.type]}</span>
+          <span>{ADMIN_TYPE_LABEL[v.type]}</span>
           <span aria-hidden="true">·</span>
           <span className={v.counted ? "text-warning" : "text-muted-foreground"}>
             {v.counted ? "counted" : "not counted"}

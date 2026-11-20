@@ -132,6 +132,10 @@ describe("proctored quiz entry and exam route", () => {
     await renderAt(`/learn/${DSA}/quiz`);
     expect(await screen.findByText("Attempt history")).toBeInTheDocument();
     expect(screen.getByText("⚠ 1")).toBeInTheDocument();
+    const chip = screen.getByText("1 warnings");
+    expect(chip).toHaveClass("sr-only");
+    expect(chip.parentElement).toHaveTextContent("⚠ 11 warnings");
+    expect(screen.getByText("⚠ 1")).toHaveAttribute("aria-hidden", "true");
   });
 
   describe("attempt limits and sessions", () => {

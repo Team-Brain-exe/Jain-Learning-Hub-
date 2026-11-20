@@ -27,10 +27,28 @@ describe("QuizTimer", () => {
   });
 
   it("announces thresholds in a polite live region", () => {
-    const { container } = render(<QuizTimer secondsLeft={299} />);
+    const { container, rerender } = render(<QuizTimer secondsLeft={301} />);
     const live = container.querySelector('[aria-live="polite"]');
+    expect(live).toBeEmptyDOMElement();
+    rerender(<QuizTimer secondsLeft={299} />);
     expect(live).toHaveTextContent("5 minutes left");
     expect(live).toHaveClass("sr-only");
+  });
+
+  it("does not announce a threshold larger than a short exam at start", () => {
+    const { container, rerender } = render(<QuizTimer secondsLeft={240} />);
+    const live = container.querySelector('[aria-live="polite"]');
+    expect(live).toBeEmptyDOMElement();
+    rerender(<QuizTimer secondsLeft={239} />);
+    expect(live).toBeEmptyDOMElement();
+    rerender(<QuizTimer secondsLeft={60} />);
+    expect(live).toHaveTextContent("1 minute left");
+  });
+
+  it("announces the most urgent threshold passed in one jump", () => {
+    const { container, rerender } = render(<QuizTimer secondsLeft={700} />);
+    rerender(<QuizTimer secondsLeft={50} />);
+    expect(container.querySelector('[aria-live="polite"]')).toHaveTextContent("1 minute left");
   });
 
   it("has an empty live region above 10 minutes", () => {

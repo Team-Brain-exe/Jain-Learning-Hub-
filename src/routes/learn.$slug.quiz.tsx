@@ -156,7 +156,8 @@ function ProctoredQuiz({
                   <span className="flex items-center gap-2">
                     {n > 0 && (
                       <span className="rounded bg-warning/15 px-1.5 text-xs font-semibold text-warning">
-                        ⚠ {n}
+                        <span aria-hidden="true">⚠ {n}</span>
+                        <span className="sr-only">{n} warnings</span>
                       </span>
                     )}
                     <span

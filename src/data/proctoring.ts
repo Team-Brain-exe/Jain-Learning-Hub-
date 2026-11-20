@@ -455,3 +455,14 @@ export const TYPE_LABEL: Record<ViolationType, string> = {
   second_tab: "The exam was opened in another tab.",
   fullscreen_unsupported: "Fullscreen isn't available on this device.",
 };
+
+/** Neutral, third-person label for each violation type (admin timeline). */
+export const ADMIN_TYPE_LABEL: Record<ViolationType, string> = {
+  tab_hidden: "Left the exam tab",
+  window_blur: "Window lost focus",
+  fullscreen_exit: "Exited fullscreen",
+  copy_paste: "Copy/paste detected",
+  context_menu: "Right-click detected",
+  second_tab: "Opened in another tab",
+  fullscreen_unsupported: "Fullscreen unavailable — warn-only",
+};

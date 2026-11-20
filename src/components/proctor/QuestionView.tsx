@@ -138,7 +138,7 @@ export function QuestionView({
                 onChange={() => pick(original)}
                 className="h-4 w-4 accent-primary"
               />
-              <span className="flex-1 select-none">{question.options[original]}</span>
+              <span className="flex-1">{question.options[original]}</span>
               {wrongPick && <XCircle className="h-4 w-4 shrink-0" aria-label="Your answer" />}
               <kbd
                 aria-hidden="true"

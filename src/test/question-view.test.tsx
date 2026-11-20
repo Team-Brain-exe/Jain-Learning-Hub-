@@ -71,6 +71,11 @@ describe("QuestionView", () => {
     expect(screen.getByText("Prompt a")).toHaveClass("select-none");
   });
 
+  it("keeps option text selectable (only the question text is select-none)", () => {
+    render(<QuestionView question={q("a")} {...base()} />);
+    expect(screen.getByText("Gamma")).not.toHaveClass("select-none");
+  });
+
   it("readOnly disables inputs, hides flag/clear, keeps navigation", () => {
     render(<QuestionView question={q("a")} {...base()} readOnly />);
     expect(screen.getByRole("button", { name: /Previous|Prev/ })).toBeInTheDocument();

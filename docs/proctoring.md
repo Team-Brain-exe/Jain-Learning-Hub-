@@ -38,6 +38,13 @@ A proctored exam is a quiz with a `proctor` config (time limit, maximum counted 
 
 Events are debounced to one per second. The warning dialog says an event was **recorded**.
 
+A single `fullscreen_unsupported` entry, whether the API is missing or the browser refused to
+enter fullscreen, switches the rest of that attempt to warn-only. From then on fullscreen is no
+longer enforced in any tab: no guard overlay, and fullscreen exits are no longer recorded. Other
+events are still recorded and counted. Warn-only is derived from the session's violation log, so a
+reload or a second tab keeps it. This is deliberate: a browser or device limitation must never
+block a student unfairly.
+
 ## 3. What is NOT detected
 
 - Another device or a phone.

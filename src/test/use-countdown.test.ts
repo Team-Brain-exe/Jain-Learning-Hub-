@@ -68,6 +68,25 @@ describe("useCountdown", () => {
     expect(result.current.secondsLeft).toBe(210);
   });
 
+  it("shows the full time on the first render after a deadline is set or changed", () => {
+    const seen: number[] = [];
+    const { rerender } = renderHook(
+      ({ deadline }: { deadline: number | null }) => {
+        const r = useCountdown(deadline, vi.fn());
+        seen.push(r.secondsLeft);
+        return r;
+      },
+      { initialProps: { deadline: null as number | null } },
+    );
+    seen.length = 0;
+    rerender({ deadline: Date.now() + 600_000 });
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((s) => s === 600)).toBe(true);
+    seen.length = 0;
+    rerender({ deadline: Date.now() + 120_000 });
+    expect(seen.every((s) => s === 120)).toBe(true);
+  });
+
   it("does not restart when the onExpire identity changes", () => {
     const first = vi.fn();
     const second = vi.fn();

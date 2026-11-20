@@ -246,6 +246,9 @@ export function ExamOptions({
         ))}
       </div>
       <p className="mt-1 text-xs text-muted-foreground">Tick every correct answer.</p>
+      {all.length === 0 && (
+        <p className="mt-1 text-xs text-destructive">Tick at least one correct answer.</p>
+      )}
     </>
   );
 }

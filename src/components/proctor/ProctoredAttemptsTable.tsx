@@ -69,9 +69,10 @@ export function ProctoredAttemptsTable({
                 const expanded = open.has(a.id);
                 const panelId = `timeline-${a.id}`;
                 // The attempt stores its submission time; exam start = submission − time taken.
-                const startedAt = new Date(
-                  new Date(a.at).getTime() - a.meta.timeTakenSec * 1000,
-                ).toISOString();
+                // A corrupt row must not throw: fall back to `at` as the start.
+                const atValid = Number.isFinite(Date.parse(a.at));
+                const startMs = Date.parse(a.at) - a.meta.timeTakenSec * 1000;
+                const startedAt = Number.isFinite(startMs) ? new Date(startMs).toISOString() : a.at;
                 return (
                   <Fragment key={a.id}>
                     <TableRow>
@@ -80,7 +81,7 @@ export function ProctoredAttemptsTable({
                           type="button"
                           aria-expanded={expanded}
                           aria-controls={panelId}
-                          aria-label={`${expanded ? "Hide" : "Show"} violation timeline for ${name}`}
+                          aria-label={`Show violation timeline for ${name}`}
                           onClick={() => toggle(a.id)}
                           className="inline-flex items-center gap-1 text-left"
                         >
@@ -98,7 +99,9 @@ export function ProctoredAttemptsTable({
                         {warnings}
                       </TableCell>
                       <TableCell>{autoLabel(a.meta)}</TableCell>
-                      <TableCell className="whitespace-nowrap">{fmtDateTime(a.at)}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {atValid ? fmtDateTime(a.at) : "—"}
+                      </TableCell>
                     </TableRow>
                     {expanded && (
                       <TableRow>

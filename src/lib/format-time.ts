@@ -18,17 +18,17 @@ export function formatDuration(totalSeconds: number): string {
   return m > 0 ? `${m} min ${s % 60} s` : `${s} s`;
 }
 
-/** Local 24h clock time, HH:MM:SS, for an ISO timestamp. */
+/** Local 24h clock time, HH:MM:SS, for an ISO timestamp ("—" when unparseable). */
 export function formatClock(iso: string): string {
   const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "—";
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-/** "+mm:ss" offset of `atIso` from `startIso` (clamped at zero). */
+/** "+mm:ss" offset of `atIso` from `startIso` (clamped at zero; "—" when unparseable). */
 export function formatOffset(startIso: string, atIso: string): string {
-  const s = Math.max(
-    0,
-    Math.floor((new Date(atIso).getTime() - new Date(startIso).getTime()) / 1000),
-  );
+  const diff = Date.parse(atIso) - Date.parse(startIso);
+  if (!Number.isFinite(diff)) return "—";
+  const s = Math.max(0, Math.floor(diff / 1000));
   return `+${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
 }
