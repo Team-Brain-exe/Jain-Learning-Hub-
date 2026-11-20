@@ -26,6 +26,7 @@ from app.routers import (
     learning,
     certificates,
     auth,
+    ai_reviews,
 )
 
 # Create database tables
@@ -109,3 +110,4 @@ app.include_router(courses.router)
 app.include_router(uploads.router)
 app.include_router(learning.router)
 app.include_router(certificates.router)
+app.include_router(ai_reviews.router)
