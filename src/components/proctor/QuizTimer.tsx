@@ -1,21 +1,10 @@
 import { Clock } from "lucide-react";
 
+import { formatTime } from "@/lib/format-time";
 import { cn } from "@/lib/utils";
 
 const WARNING_SECONDS = 300;
 const DANGER_SECONDS = 60;
-
-function pad(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-function format(totalSeconds: number): string {
-  const s = Math.max(0, Math.floor(totalSeconds));
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
-}
 
 /** Text only changes when a threshold is crossed, so assistive tech announces just those moments. */
 function announcement(secondsLeft: number): string {
@@ -42,7 +31,7 @@ export function QuizTimer({ secondsLeft, className }: { secondsLeft: number; cla
       )}
     >
       <Clock className="h-4 w-4" aria-hidden="true" />
-      <span>{format(secondsLeft)}</span>
+      <span>{formatTime(secondsLeft)}</span>
       <span aria-live="polite" className="sr-only">
         {announcement(secondsLeft)}
       </span>
