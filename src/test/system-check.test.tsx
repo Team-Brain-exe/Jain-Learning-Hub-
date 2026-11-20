@@ -5,7 +5,7 @@ import { SystemCheck } from "@/components/proctor/SystemCheck";
 
 describe("SystemCheck", () => {
   it("shows the warn-only note when fullscreen is unsupported (jsdom)", () => {
-    render(<SystemCheck singleTab />);
+    render(<SystemCheck />);
     expect(
       screen.getByText(
         "Fullscreen isn't available on this device, so the exam runs in warn-only mode.",
@@ -13,18 +13,22 @@ describe("SystemCheck", () => {
     ).toBeInTheDocument();
   });
 
-  it("reflects singleTab in its row", () => {
-    const { unmount } = render(<SystemCheck singleTab />);
-    const row = screen.getByText("Exam is open in one tab").closest("li")!;
-    expect(row).toHaveTextContent("✓ Yes");
-    unmount();
-    render(<SystemCheck singleTab={false} />);
-    expect(screen.getByText("Exam is open in one tab").closest("li")).toHaveTextContent("✕ No");
+  it("has no one-tab row (it cannot be known before the exam starts)", () => {
+    render(<SystemCheck />);
+    expect(screen.queryByText("Exam is open in one tab")).not.toBeInTheDocument();
+    expect(screen.getByText("Fullscreen supported")).toBeInTheDocument();
+  });
+
+  it("omits the fullscreen row and warn-only note when fullscreen is not required", () => {
+    render(<SystemCheck requireFullscreen={false} />);
+    expect(screen.queryByText("Fullscreen supported")).not.toBeInTheDocument();
+    expect(screen.queryByText(/warn-only/)).not.toBeInTheDocument();
+    expect(screen.getByText("Screen size is enough")).toBeInTheDocument();
   });
 
   it("renders neutral Checking… with no red state before the checks run", async () => {
     const { renderToString } = await import("react-dom/server");
-    const html = renderToString(<SystemCheck singleTab />);
+    const html = renderToString(<SystemCheck />);
     expect(html).toContain("Checking…");
     expect(html).not.toContain("✕");
     expect(html).not.toContain("warn-only");

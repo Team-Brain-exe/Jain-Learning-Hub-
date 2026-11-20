@@ -14,10 +14,11 @@ const quiz: Quiz = {
   ],
 };
 
-const setup = (attemptsLeft = 2) => {
+const setup = (attemptsLeft = 2, requireFullscreen?: boolean) => {
   const onStart = vi.fn();
   render(
     <ExamIntro
+      {...(requireFullscreen === undefined ? {} : { requireFullscreen })}
       quiz={quiz}
       courseTitle="Jain Studies"
       attemptsLeft={attemptsLeft}
@@ -73,5 +74,20 @@ describe("ExamIntro", () => {
     setup(0);
     fireEvent.click(rules());
     expect(screen.getByRole("button", { name: "Start proctored exam" })).toBeDisabled();
+  });
+
+  it("drops the fullscreen rule and system-check row when fullscreen is not required", () => {
+    setup(2, false);
+    expect(screen.queryByText("The exam must stay in fullscreen.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Fullscreen supported")).not.toBeInTheDocument();
+    expect(screen.queryByText(/warn-only/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Leaving this tab, copying or right-clicking is recorded."),
+    ).toBeInTheDocument();
+  });
+
+  it("has no one-tab row in the intro system check", () => {
+    setup();
+    expect(screen.queryByText("Exam is open in one tab")).not.toBeInTheDocument();
   });
 });

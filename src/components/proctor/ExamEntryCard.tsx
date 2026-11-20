@@ -12,6 +12,8 @@ interface ExamEntryCardProps {
   hasActiveSession: boolean;
   /** Effective duration in minutes (already includes any time multiplier). */
   minutes: number;
+  /** Whether the exam must stay in fullscreen (`quiz.proctor.requireFullscreen`). Defaults to true. */
+  requireFullscreen?: boolean;
 }
 
 function Stat({ label, value }: { label: string; value: string | number }) {
@@ -31,6 +33,7 @@ export function ExamEntryCard({
   maxAttempts,
   hasActiveSession,
   minutes,
+  requireFullscreen = true,
 }: ExamEntryCardProps) {
   const blocked = attemptsLeft <= 0 && !hasActiveSession;
 
@@ -50,8 +53,8 @@ export function ExamEntryCard({
             </span>
           </div>
           <p className="text-sm text-muted-foreground">
-            Opens in a new full-screen tab. The timer starts when you press Start and keeps running
-            if you close the tab.
+            {requireFullscreen ? "Opens in a new full-screen tab." : "Opens in a new tab."} The
+            timer starts when you press Start and keeps running if you close the tab.
           </p>
         </div>
       </div>

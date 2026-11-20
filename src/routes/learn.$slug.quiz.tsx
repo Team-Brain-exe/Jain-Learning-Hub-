@@ -141,6 +141,7 @@ function ProctoredQuiz({
         maxAttempts={quiz.maxAttempts}
         hasActiveSession={active}
         minutes={minutes}
+        requireFullscreen={quiz.proctor?.requireFullscreen ?? true}
       />
 
       {mine.length > 0 && (

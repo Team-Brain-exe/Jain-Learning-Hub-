@@ -11,7 +11,7 @@ const captured = vi.hoisted(() => ({ escape: undefined as undefined | ((e: Event
 vi.mock("@/components/ui/alert-dialog", async (orig) => {
   const actual = await orig<typeof import("@/components/ui/alert-dialog")>();
   const Content = React.forwardRef<HTMLDivElement, Record<string, unknown>>((props, ref) => {
-    captured.escape = props.onEscapeKeyDown as typeof captured.escape;
+    captured.escape = props["onEscapeKeyDown"] as typeof captured.escape;
     return <actual.AlertDialogContent ref={ref} {...props} />;
   });
   Content.displayName = "CapturingContent";

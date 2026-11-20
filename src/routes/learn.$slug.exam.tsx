@@ -103,6 +103,8 @@ function ExamShell({
   // The sheet unmounts without closing when the questions are hidden; don't leave shortcuts off.
   const [sheetOpen, setSheetOpen] = useState(false);
   if (sheetOpen && !showQuestions) setSheetOpen(false);
+  // Likewise the submit dialog: don't let it pop back up after fullscreen is re-entered.
+  if (submitOpen && blocked) setSubmitOpen(false);
 
   const prev = () => {
     if (current > 0) exam.go(current - 1);
@@ -192,12 +194,13 @@ function ExamShell({
             minutes={minutes}
             maxViolations={cfg.maxViolations}
             onStart={() => void exam.start()}
-            singleTab={!exam.otherTabActive}
+            requireFullscreen={cfg.requireFullscreen}
           />
         </>
       )}
 
-      {(exam.phase === "active" || exam.phase === "reviewing") && session && (
+      {/* Hidden while an overlay blocks the exam (the guard shows the timer) so focus can't escape. */}
+      {(exam.phase === "active" || exam.phase === "reviewing") && session && !blocked && (
         <ExamTopBar
           title={courseTitle}
           section={exam.phase === "active" ? question?.section : undefined}

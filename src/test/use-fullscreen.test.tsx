@@ -13,14 +13,14 @@ function setFullscreenElement(el: Element | null) {
 
 describe("useFullscreen", () => {
   beforeEach(() => {
-    root.requestFullscreen = vi.fn().mockResolvedValue(undefined);
-    (document as unknown as Record<string, unknown>).exitFullscreen = vi
+    root["requestFullscreen"] = vi.fn().mockResolvedValue(undefined);
+    (document as unknown as Record<string, unknown>)["exitFullscreen"] = vi
       .fn()
       .mockResolvedValue(undefined);
     Object.defineProperty(document, "fullscreenElement", { configurable: true, value: null });
   });
   afterEach(() => {
-    delete root.requestFullscreen;
+    delete root["requestFullscreen"];
   });
 
   it("tracks fullscreenchange in both directions", () => {
@@ -36,8 +36,8 @@ describe("useFullscreen", () => {
   it("enter requests fullscreen and resolves true; false on rejection", async () => {
     const { result } = renderHook(() => useFullscreen());
     await expect(result.current.enter()).resolves.toBe(true);
-    expect(root.requestFullscreen).toHaveBeenCalled();
-    root.requestFullscreen = vi.fn().mockRejectedValue(new Error("denied"));
+    expect(root["requestFullscreen"]).toHaveBeenCalled();
+    root["requestFullscreen"] = vi.fn().mockRejectedValue(new Error("denied"));
     await expect(result.current.enter()).resolves.toBe(false);
   });
 
@@ -48,7 +48,7 @@ describe("useFullscreen", () => {
   });
 
   it("is unsupported without requestFullscreen", async () => {
-    delete root.requestFullscreen;
+    delete root["requestFullscreen"];
     const { result } = renderHook(() => useFullscreen());
     expect(result.current.supported).toBe(false);
     await expect(result.current.enter()).resolves.toBe(false);

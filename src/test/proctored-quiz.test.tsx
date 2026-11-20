@@ -216,4 +216,77 @@ describe("proctored quiz entry and exam route", () => {
       expect(examSessions.get()[key]!.answers[qid()]).toBeDefined();
     });
   });
+
+  describe("fullscreen overlay", () => {
+    const docRec = document as unknown as Record<string, unknown>;
+    const rootRec = document.documentElement as unknown as Record<string, unknown>;
+    const setFsElement = (el: Element | null) => {
+      Object.defineProperty(document, "fullscreenElement", { configurable: true, value: el });
+      document.dispatchEvent(new Event("fullscreenchange"));
+    };
+    beforeEach(() => {
+      rootRec["requestFullscreen"] = vi.fn(async () => {
+        setFsElement(document.documentElement);
+      });
+      docRec["exitFullscreen"] = vi.fn(async () => {
+        setFsElement(null);
+      });
+      Object.defineProperty(document, "fullscreenElement", { configurable: true, value: null });
+    });
+    afterEach(() => {
+      delete rootRec["requestFullscreen"];
+      delete docRec["exitFullscreen"];
+      Object.defineProperty(document, "fullscreenElement", { configurable: true, value: null });
+    });
+
+    const focusables = () =>
+      Array.from(
+        document.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex='-1'])",
+        ),
+      );
+
+    it("hides the top bar while the fullscreen guard is open, so focus cannot leave the guard", async () => {
+      // A resumed session always starts outside fullscreen, so the guard opens.
+      const creator = platform.get().users.find((u) => u.id === "u-creator")!;
+      const s = startExam(creator, DSA, getQuiz(DSA)!, "tab-gone");
+      if (typeof s === "string") throw new Error(s);
+      examSessions.set({ [sessionKey(DSA, "u-creator")]: { ...s, lastBeat: 0 } });
+      await renderAt(`/learn/${DSA}/exam`);
+      expect(
+        await screen.findByRole("dialog", { name: "Return to fullscreen to continue" }),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Submit" })).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Answered progress")).not.toBeInTheDocument();
+      const enter = screen.getByRole("button", { name: "Enter fullscreen" });
+      expect(focusables()).toEqual([enter]);
+    });
+
+    it("does not reopen the submit dialog after fullscreen is re-entered", async () => {
+      await renderAt(`/learn/${DSA}/exam`);
+      fireEvent.click(await screen.findByRole("checkbox"));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Start proctored exam" }));
+      });
+      expect(document.fullscreenElement).toBe(document.documentElement);
+      fireEvent.click(screen.getAllByRole("button", { name: "Review & submit" })[0]!);
+      fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+      expect(screen.getByRole("alertdialog", { name: "Submit exam?" })).toBeInTheDocument();
+
+      act(() => setFsElement(null));
+      fireEvent.click(screen.getByRole("button", { name: "I understand" })); // violation warning
+      expect(
+        screen.getByRole("dialog", { name: "Return to fullscreen to continue" }),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("alertdialog", { name: "Submit exam?" })).not.toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Enter fullscreen" }));
+      });
+      expect(
+        screen.queryByRole("dialog", { name: "Return to fullscreen to continue" }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("alertdialog", { name: "Submit exam?" })).not.toBeInTheDocument();
+    });
+  });
 });

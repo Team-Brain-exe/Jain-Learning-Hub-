@@ -16,16 +16,16 @@ interface ExamIntroProps {
   /** Violations after which the attempt is submitted automatically. */
   maxViolations: number;
   onStart: () => void;
-  /** Whether no other tab holds this exam session. Defaults to true. */
-  singleTab?: boolean;
+  /** Whether the exam must stay in fullscreen (`quiz.proctor.requireFullscreen`). Defaults to true. */
+  requireFullscreen?: boolean;
 }
 
-const rulesFor = (minutes: number, maxViolations: number) => [
+const rulesFor = (minutes: number, maxViolations: number, requireFullscreen: boolean) => [
   {
     icon: Clock,
     text: `You have ${minutes} minutes. The timer keeps running if you refresh or close the tab.`,
   },
-  { icon: Maximize, text: "The exam must stay in fullscreen." },
+  ...(requireFullscreen ? [{ icon: Maximize, text: "The exam must stay in fullscreen." }] : []),
   { icon: MousePointerClick, text: "Leaving this tab, copying or right-clicking is recorded." },
   {
     icon: ShieldAlert,
@@ -52,7 +52,7 @@ export function ExamIntro({
   minutes,
   maxViolations,
   onStart,
-  singleTab = true,
+  requireFullscreen = true,
 }: ExamIntroProps) {
   const [agreed, setAgreed] = useState(false);
 
@@ -91,7 +91,7 @@ export function ExamIntro({
 
           <h2 className="mt-6 text-base font-semibold">Rules</h2>
           <ul className="mt-2 space-y-2">
-            {rulesFor(minutes, maxViolations).map(({ icon: Icon, text }) => (
+            {rulesFor(minutes, maxViolations, requireFullscreen).map(({ icon: Icon, text }) => (
               <li key={text} className="flex items-start gap-3 text-sm">
                 <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                 <span>{text}</span>
@@ -121,7 +121,7 @@ export function ExamIntro({
         </section>
 
         <div className="space-y-6">
-          <SystemCheck singleTab={singleTab} />
+          <SystemCheck requireFullscreen={requireFullscreen} />
           <section className={card} aria-labelledby="shortcuts-title">
             <h2 id="shortcuts-title" className="text-base font-semibold">
               Keyboard shortcuts
