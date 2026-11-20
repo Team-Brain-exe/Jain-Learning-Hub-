@@ -9,28 +9,28 @@ The components are not wired into a route yet, so each one was rendered on a tem
 
 ## Results
 
-| Component | 375px | 1280px | Keyboard | Notes |
-|---|---|---|---|---|
-| `ConsentStepper` (M-1) | ✅ | ⚠️ | ✅ | Steps 7–10 hidden off to the right at 1280px (#21) |
-| `ProceedToUploadButton` (M-2) | ✅ | ✅ | ✅ | Tooltip opens on keyboard focus, ring visible; hint read twice (#22) |
-| `RejectedRequestCard` (M-3) | ✅ | ✅ | ✅ | Long reason wraps, no overflow; hydration error (#18), `role="alert"` (#19) |
-| `SupportedFileTypes` + `FileTypeIcon` (M-4) | ✅ | ✅ | n/a | 2 / 6 columns as specified; icons `aria-hidden` |
-| `validateFile` (M-4) | | | | Unit tests pass; behaviour matches the spec |
+| Component                                   | 375px | 1280px | Keyboard | Notes                                                                       |
+| ------------------------------------------- | ----- | ------ | -------- | --------------------------------------------------------------------------- |
+| `ConsentStepper` (M-1)                      | ✅    | ⚠️     | ✅       | Steps 7–10 hidden off to the right at 1280px (#21)                          |
+| `ProceedToUploadButton` (M-2)               | ✅    | ✅     | ✅       | Tooltip opens on keyboard focus, ring visible; hint read twice (#22)        |
+| `RejectedRequestCard` (M-3)                 | ✅    | ✅     | ✅       | Long reason wraps, no overflow; hydration error (#18), `role="alert"` (#19) |
+| `SupportedFileTypes` + `FileTypeIcon` (M-4) | ✅    | ✅     | n/a      | 2 / 6 columns as specified; icons `aria-hidden`                             |
+| `validateFile` (M-4)                        |       |        |          | Unit tests pass; behaviour matches the spec                                 |
 
 Page-level checks: no horizontal page scroll at 375px or 1280px; every button and focusable wrapper
 is at least 40px tall; `npm run test` passes (64/64).
 
 ## Contrast (computed, target ≥ 4.5:1)
 
-| Text | Size | Ratio | Result |
-|---|---|---|---|
-| Actor chips: Student, System, AI | 10px | 5.52–6.05 | ✅ |
-| Actor chip: **Faculty** (`text-warning` on `bg-warning/15`) | 10px | **3.38** | ❌ |
-| Step titles and descriptions | 12px | 6.80 | ✅ |
-| Locked-button hint | 12px | 6.37 | ✅ |
-| Rejected card: date line / reason | 12 / 14px | 5.81 / 16.72 | ✅ |
-| **"Submit revised request"** (`text-destructive` on tinted card) | 14px | **4.08** | ❌ |
-| File grid: extensions / "Up to N MB" | 11 / 10px | 6.56 / 6.05 | ✅ |
+| Text                                                             | Size      | Ratio        | Result |
+| ---------------------------------------------------------------- | --------- | ------------ | ------ |
+| Actor chips: Student, System, AI                                 | 10px      | 5.52–6.05    | ✅     |
+| Actor chip: **Faculty** (`text-warning` on `bg-warning/15`)      | 10px      | **3.38**     | ❌     |
+| Step titles and descriptions                                     | 12px      | 6.80         | ✅     |
+| Locked-button hint                                               | 12px      | 6.37         | ✅     |
+| Rejected card: date line / reason                                | 12 / 14px | 5.81 / 16.72 | ✅     |
+| **"Submit revised request"** (`text-destructive` on tinted card) | 14px      | **4.08**     | ❌     |
+| File grid: extensions / "Up to N MB"                             | 11 / 10px | 6.56 / 6.05  | ✅     |
 
 ## Bugs logged
 
@@ -47,7 +47,6 @@ is at least 40px tall; `npm run test` passes (64/64).
   renders no current step, though the header badge clamps it.
 - **#22 [Mandhan-M2] Locked hint is announced twice.** On focus, the wrapper's `aria-describedby`
   contains both the visible hint and the Radix tooltip, which hold the same text.
-
 
 ## Not testable yet
 
