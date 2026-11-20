@@ -42,7 +42,7 @@ export function ReviewScreen({
   const attention = entries.filter((e) => !e.done || e.flag);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-8 sm:px-6">
       <h1 className="text-2xl font-bold">Review your answers</h1>
       <div className="grid grid-cols-3 gap-3">
         <Tile label="Answered" value={answered} tone="text-success" />

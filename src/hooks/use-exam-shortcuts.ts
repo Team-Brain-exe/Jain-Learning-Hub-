@@ -9,10 +9,12 @@ interface Options {
   onFlag: () => void;
 }
 
+const NON_TEXT_INPUTS = new Set(["radio", "checkbox", "button", "submit", "reset"]);
+
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
+  if (target instanceof HTMLInputElement) return !NON_TEXT_INPUTS.has(target.type);
   return (
-    target instanceof HTMLInputElement ||
     target instanceof HTMLTextAreaElement ||
     target instanceof HTMLSelectElement ||
     target.isContentEditable ||
@@ -20,7 +22,11 @@ function isTypingTarget(target: EventTarget | null): boolean {
   );
 }
 
-/** Keyboard shortcuts for the exam: 1-9 pick an option, arrows navigate, F flags. */
+/**
+ * Keyboard shortcuts for the exam: 1-9 pick an option, arrows navigate, F flags.
+ * Key repeats, modifier combos and typing in text fields are ignored. Dialog suppression is the
+ * caller's job: the exam shell must pass `enabled={!anyDialogOpen && phase === "active"}`.
+ */
 export function useExamShortcuts(opts: Options): void {
   const ref = useRef(opts);
   ref.current = opts;
@@ -29,14 +35,18 @@ export function useExamShortcuts(opts: Options): void {
     const handler = (e: KeyboardEvent) => {
       const o = ref.current;
       if (!o.enabled) return;
+      if (e.repeat) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (isTypingTarget(e.target)) return;
       if (/^[1-9]$/.test(e.key)) {
         const idx = Number(e.key) - 1;
         if (idx < o.optionCount) o.onPick(idx);
-      } else if (e.key === "ArrowLeft") o.onPrev();
-      else if (e.key === "ArrowRight") o.onNext();
-      else if (e.key === "f" || e.key === "F") o.onFlag();
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        // Stop a focused radio from moving its selection natively.
+        e.preventDefault();
+        if (e.key === "ArrowLeft") o.onPrev();
+        else o.onNext();
+      } else if (e.key === "f" || e.key === "F") o.onFlag();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);

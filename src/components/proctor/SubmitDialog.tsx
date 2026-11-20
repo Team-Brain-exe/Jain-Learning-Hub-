@@ -29,8 +29,16 @@ export function SubmitDialog({ open, unanswered, onCancel, onConfirm }: SubmitDi
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onCancel}>Keep working</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>Submit now</AlertDialogAction>
+          <AlertDialogCancel>Keep working</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => {
+              // The parent owns closing; this keeps onOpenChange(false) from also firing onCancel.
+              e.preventDefault();
+              onConfirm();
+            }}
+          >
+            Submit now
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

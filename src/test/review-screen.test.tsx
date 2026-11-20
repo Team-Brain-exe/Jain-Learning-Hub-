@@ -64,8 +64,17 @@ describe("SubmitDialog", () => {
       screen.getByText(/3 questions are unanswered and will be marked wrong/),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Submit now" }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onCancel).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Keep working" }));
-    expect(onConfirm).toHaveBeenCalled();
-    expect(onCancel).toHaveBeenCalled();
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses singular copy for one unanswered question", () => {
+    render(<SubmitDialog open unanswered={1} onCancel={vi.fn()} onConfirm={vi.fn()} />);
+    expect(
+      screen.getByText(/1 question is unanswered and will be marked wrong/),
+    ).toBeInTheDocument();
   });
 });

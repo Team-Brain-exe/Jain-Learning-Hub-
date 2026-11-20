@@ -71,8 +71,10 @@ describe("QuestionView", () => {
     expect(screen.getByText("Prompt a")).toHaveClass("select-none");
   });
 
-  it("readOnly disables inputs and hides flag/clear", () => {
+  it("readOnly disables inputs, hides flag/clear, keeps navigation", () => {
     render(<QuestionView question={q("a")} {...base()} readOnly />);
+    expect(screen.getByRole("button", { name: /Previous|Prev/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Save & next/ })).toBeInTheDocument();
     expect(screen.getAllByRole("radio")[0]).toBeDisabled();
     expect(screen.queryByRole("button", { name: /Flag/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "Clear answer" })).toBeNull();
@@ -98,6 +100,38 @@ describe("useExamShortcuts", () => {
     expect(h.onNext).toHaveBeenCalled();
     fireEvent.keyDown(window, { key: "5" });
     expect(h.onPick).toHaveBeenCalledTimes(1);
+  });
+
+  it("still works when a radio or checkbox has focus, and stops native radio arrows", () => {
+    const h = setup();
+    for (const type of ["radio", "checkbox"]) {
+      const input = document.createElement("input");
+      input.type = type;
+      document.body.appendChild(input);
+      input.focus();
+      fireEvent.keyDown(input, { key: "2" });
+      fireEvent.keyDown(input, { key: "f" });
+      input.remove();
+    }
+    expect(h.onPick).toHaveBeenCalledTimes(2);
+    expect(h.onFlag).toHaveBeenCalledTimes(2);
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    document.body.appendChild(radio);
+    const notCancelled = fireEvent.keyDown(radio, { key: "ArrowRight" });
+    radio.remove();
+    expect(notCancelled).toBe(false);
+    expect(h.onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores key repeats", () => {
+    const h = setup();
+    fireEvent.keyDown(window, { key: "f", repeat: true });
+    fireEvent.keyDown(window, { key: "ArrowRight", repeat: true });
+    fireEvent.keyDown(window, { key: "1", repeat: true });
+    expect(h.onFlag).not.toHaveBeenCalled();
+    expect(h.onNext).not.toHaveBeenCalled();
+    expect(h.onPick).not.toHaveBeenCalled();
   });
 
   it("ignores when disabled, with modifiers, or in inputs", () => {

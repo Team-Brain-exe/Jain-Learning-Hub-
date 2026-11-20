@@ -55,8 +55,9 @@ function NavigatorBody({
   onGo,
   cellHeight,
 }: QuestionNavigatorProps & { cellHeight: string }) {
-  const total = orderedEntries(quiz, order).length;
-  const answered = order.filter((id) => isAnswered(answers[id])).length;
+  const entries = orderedEntries(quiz, order);
+  const total = entries.length;
+  const answered = entries.filter((e) => isAnswered(answers[e.question.id])).length;
   return (
     <div>
       <h2 className="font-semibold">Questions</h2>
@@ -100,7 +101,7 @@ function NavigatorBody({
                         : isFlagged
                           ? "bg-warning/15 text-warning ring-1 ring-warning"
                           : isDone
-                            ? "bg-success text-white"
+                            ? "bg-success text-primary-foreground"
                             : "border border-border hover:bg-accent",
                     )}
                   >

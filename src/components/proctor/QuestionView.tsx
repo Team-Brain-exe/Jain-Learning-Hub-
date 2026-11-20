@@ -55,24 +55,39 @@ export function QuestionView({
   };
 
   return (
-    <section className={cn(card, "space-y-5")}>
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          Question {index + 1} of {total} · 1 mark
+    <section className={cn(card, "space-y-5 p-4 sm:p-5")}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="whitespace-nowrap text-sm text-muted-foreground">
+          <span className="sm:hidden">
+            Q{index + 1} of {total}
+          </span>
+          <span className="hidden sm:inline">
+            Question {index + 1} of {total} · 1 mark
+          </span>
         </p>
         {!readOnly && (
           <button
             type="button"
             aria-pressed={flagged}
+            aria-label={flagged ? "Flagged" : "Flag for review"}
             onClick={onFlag}
             className={cn(
               btnOutline,
-              "h-9 px-3",
+              "h-9 shrink-0 whitespace-nowrap px-3",
               flagged && "border-warning bg-warning/15 text-warning",
             )}
           >
             <Flag className="h-4 w-4" aria-hidden="true" />
-            {flagged ? "Flagged" : "Flag for review"}
+            <span aria-hidden="true">
+              {flagged ? (
+                "Flagged"
+              ) : (
+                <>
+                  <span className="sm:hidden">Flag</span>
+                  <span className="hidden sm:inline">Flag for review</span>
+                </>
+              )}
+            </span>
           </button>
         )}
       </div>
@@ -109,7 +124,10 @@ export function QuestionView({
                 className="h-4 w-4 accent-primary"
               />
               <span className="flex-1 select-none">{question.options[original]}</span>
-              <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+              <kbd
+                aria-hidden="true"
+                className="hidden rounded sm:inline-block border border-border bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
+              >
                 {display + 1}
               </kbd>
             </label>
@@ -117,31 +135,40 @@ export function QuestionView({
         })}
       </div>
 
-      {!readOnly && (
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-          {hideNav ? (
-            <span />
-          ) : (
-            <button type="button" className={btnOutline} onClick={onPrev}>
-              ← Previous
-            </button>
-          )}
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+        {hideNav ? (
+          <span />
+        ) : (
+          <button
+            type="button"
+            className={cn(btnOutline, "whitespace-nowrap px-3 sm:px-5")}
+            onClick={onPrev}
+          >
+            ←<span className="sm:hidden">Prev</span>
+            <span className="hidden sm:inline">Previous</span>
+          </button>
+        )}
+        {!readOnly && (
           <button
             type="button"
             onClick={() => onAnswer(undefined)}
-            className="text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            className="whitespace-nowrap text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground"
           >
             Clear answer
           </button>
-          {hideNav ? (
-            <span />
-          ) : (
-            <button type="button" className={btn} onClick={onNext}>
-              Save &amp; next →
-            </button>
-          )}
-        </div>
-      )}
+        )}
+        {hideNav ? (
+          <span />
+        ) : (
+          <button
+            type="button"
+            className={cn(btn, "whitespace-nowrap px-3 sm:px-5")}
+            onClick={onNext}
+          >
+            Save &amp; next →
+          </button>
+        )}
+      </div>
     </section>
   );
 }
