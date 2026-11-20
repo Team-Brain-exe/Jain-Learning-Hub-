@@ -27,3 +27,18 @@ does not need to change when a backend arrives. Permission checks are UI-level o
 ## Swapping in a real backend
 Replace the bodies of the actions in `src/data/platform.ts` (and `signInDemo`/`signOut` in `use-auth.ts`)
 with API calls, keep the hook/selector signatures, and delete `createStore` usage.
+
+## Consent workflow (frontend)
+
+Components and utilities developed for the peer-to-peer consent and upload authorization workflow (Tickets M-1 through M-4):
+
+| Component / Utility     | File                                               | Purpose                                                                                                                  |
+| ----------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `consentSteps`          | `src/data/consent-steps.ts`                        | Complete 10-step institutional consent and review workflow data with actor mappings.                                     |
+| `ConsentStepper`        | `src/components/consent/ConsentStepper.tsx`        | Responsive 10-step stepper showing completed, current, and upcoming states with actor badges and screen reader support.  |
+| `ProceedToUploadButton` | `src/components/consent/ProceedToUploadButton.tsx` | Guarded upload action button enforcing faculty approval with accessible tooltips, icons, and mobile hints.               |
+| `RejectedRequestCard`   | `src/components/consent/RejectedRequestCard.tsx`   | Alert card displaying faculty rejection remarks, decision date, and one-click request revision flow.                     |
+| `fileTypes`             | `src/data/file-types.ts`                           | Content format specifications, allowed extensions, and maximum upload size limits (video, audio, ppt, pdf, docx, image). |
+| `FileTypeIcon`          | `src/components/consent/FileTypeIcon.tsx`          | Accessible Lucide icon mapper for all supported content formats.                                                         |
+| `SupportedFileTypes`    | `src/components/consent/SupportedFileTypes.tsx`    | Responsive visual grid showcasing accepted formats, extensions, and size limits.                                         |
+| `validateFile`          | `src/lib/validate-file.ts`                         | Case-insensitive file extension and size validation utility returning user-friendly error messages.                      |
