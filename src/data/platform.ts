@@ -7,20 +7,43 @@
 import { createStore } from "@/lib/create-store";
 import { courses as staticCourses, type Course, type Level, type Module } from "@/data/courses";
 import { sampleQuizzes } from "@/data/quizzes";
+import type { AttemptMeta, ProctorConfig } from "@/data/proctoring";
 
 export type Role = "learner" | "creator" | "reviewer" | "admin";
 export type Status = "draft" | "submitted" | "under_review" | "changes_requested" | "approved" | "rejected" | "published" | "archived";
 export type CreatorType = "Faculty Course" | "Student Creator";
 
-export interface AppUser { id: string; name: string; email: string; role: Role; creatorType?: CreatorType | undefined; department?: string | undefined }
+export interface AppUser {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  creatorType?: CreatorType | undefined;
+  department?: string | undefined;
+  timeMultiplier?: number | undefined;
+}
 export interface LessonDraft {
   id: string; title: string; minutes: number; kind: "video" | "reading" | "quiz";
   description: string; videoUrl: string; captionsUrl: string; transcript: string;
   resources: { title: string; url: string }[];
 }
 export interface ModuleDraft { id: string; title: string; lessons: LessonDraft[] }
-export interface QuizQuestion { id: string; prompt: string; options: string[]; correct: number; explanation: string }
-export interface Quiz { passMark: number; maxAttempts: number; questions: QuizQuestion[] }
+export interface QuizQuestion {
+  id: string;
+  prompt: string;
+  options: string[];
+  correct: number;
+  explanation: string;
+  type?: "single" | "multi" | "truefalse" | undefined;
+  correctAll?: number[] | undefined;
+  section?: string | undefined;
+}
+export interface Quiz {
+  passMark: number;
+  maxAttempts: number;
+  questions: QuizQuestion[];
+  proctor?: ProctorConfig | undefined;
+}
 export interface AiFinding { id: string; severity: "high" | "medium" | "low"; area: string; message: string; suggestion: string }
 export interface AiReport { generatedAt: string; provider: string; version: string; score: number; summary: string; findings: AiFinding[] }
 export interface Feedback { id: string; at: string; by: string; kind: "submitted" | "assigned" | "approve" | "reject" | "changes" | "override" | "publish" | "archive" | "comment"; text: string }
@@ -38,7 +61,16 @@ export interface Certificate {
   id: string; slug: string; courseTitle: string; learnerId: string; learnerName: string;
   status: "requested" | "issued" | "rejected"; requestedAt: string; issuedAt?: string | undefined; issuedBy?: string | undefined; quizScore?: number | undefined;
 }
-export interface QuizAttempt { id: string; userId: string; slug: string; at: string; score: number; passed: boolean; answers: Record<string, number> }
+export interface QuizAttempt {
+  id: string;
+  userId: string;
+  slug: string;
+  at: string;
+  score: number;
+  passed: boolean;
+  answers: Record<string, number | number[]>;
+  meta?: AttemptMeta | undefined;
+}
 export interface Policy { minDescriptionChars: number; minOutcomes: number; minLessons: number; defaultPassMark: number; requireQuiz: boolean }
 export interface PlatformState {
   users: AppUser[]; submissions: Submission[]; notifications: Notification[]; audit: AuditEvent[];
@@ -56,7 +88,14 @@ const uid = (p: string) => `${p}-${Math.random().toString(36).slice(2, 9)}`;
 export const slugify = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
 
 const USERS: AppUser[] = [
-  { id: "u-learner", name: "Aarav Sharma", email: "learner@demo.jain.edu", role: "learner", department: "B.Tech CSE, Year 2" },
+  {
+    id: "u-learner",
+    name: "Aarav Sharma",
+    email: "learner@demo.jain.edu",
+    role: "learner",
+    department: "B.Tech CSE, Year 2",
+    timeMultiplier: 1.5,
+  },
   { id: "u-creator", name: "Ananya Rao", email: "creator@demo.jain.edu", role: "creator", creatorType: "Student Creator", department: "B.Tech CSE, Year 4" },
   { id: "u-reviewer", name: "Dr. Meera Iyer", email: "reviewer@demo.jain.edu", role: "reviewer", department: "AIML" },
   { id: "u-reviewer2", name: "Prof. Arjun Menon", email: "reviewer2@demo.jain.edu", role: "reviewer", department: "CSE" },
@@ -284,19 +323,43 @@ export function getQuiz(slug: string, s: PlatformState = platform.get()): Quiz |
   const sub = s.submissions.find((x) => x.slug === slug && x.status === "published");
   return sub?.quiz ?? sampleQuizzes[slug];
 }
-export const scoreQuiz = (quiz: Quiz, answers: Record<string, number>) => {
-  const right = quiz.questions.filter((q) => answers[q.id] === q.correct).length;
+/** Single source of truth for correctness: certificates and bestAttempt read attempt.score. */
+export function isCorrect(q: QuizQuestion, a: number | number[] | undefined): boolean {
+  if (q.type === "multi") {
+    if (!Array.isArray(a) || a.length === 0) return false;
+    const want = [...(q.correctAll ?? [])].sort((x, y) => x - y);
+    const got = [...a].sort((x, y) => x - y);
+    return want.length === got.length && want.every((v, i) => v === got[i]);
+  }
+  return a === q.correct;
+}
+export const scoreQuiz = (quiz: Quiz, answers: Record<string, number | number[]>) => {
+  const right = quiz.questions.filter((q) => isCorrect(q, answers[q.id])).length;
   const score = quiz.questions.length ? Math.round((right / quiz.questions.length) * 100) : 0;
   return { right, total: quiz.questions.length, score, passed: score >= quiz.passMark };
 };
-export function submitAttempt(user: AppUser, slug: string, answers: Record<string, number>): QuizAttempt | string {
+export function submitAttempt(
+  user: AppUser,
+  slug: string,
+  answers: Record<string, number | number[]>,
+  meta?: AttemptMeta,
+): QuizAttempt | string {
   const s0 = platform.get();
   const quiz = getQuiz(slug, s0);
   if (!quiz) return "No assessment is available for this course.";
   const used = s0.attempts.filter((a) => a.userId === user.id && a.slug === slug).length;
   if (used >= quiz.maxAttempts) return "You have used all attempts for this assessment.";
   const r = scoreQuiz(quiz, answers);
-  const attempt: QuizAttempt = { id: uid("at"), userId: user.id, slug, at: now(), score: r.score, passed: r.passed, answers };
+  const attempt: QuizAttempt = {
+    id: uid("at"),
+    userId: user.id,
+    slug,
+    at: now(),
+    score: r.score,
+    passed: r.passed,
+    answers,
+    ...(meta ? { meta } : {}),
+  };
   mutate((s) => ({ ...s, attempts: [attempt, ...s.attempts] }));
   return attempt;
 }
