@@ -14,24 +14,45 @@ logger = logging.getLogger(__name__)
 
 class AIReviewService:
     @staticmethod
-    def trigger_ai_review(db: Session, course: Course) -> AIReviewJob:
+    def trigger_ai_review(db: Session, course: Course, job_id: Optional[str] = None) -> AIReviewJob:
         """
         Executes grounded AI review for the submitted course and its attached assets.
         Extracts content, checks claims against approved curriculum references (RAG),
         and populates structured advisory findings for faculty review.
+        Idempotent: Reuses or updates existing job if already initiated, preventing race conditions.
         """
-        # 1. Create Queued AI Review Job record
-        job = AIReviewJob(
-            course_id=course.id,
-            status=AIJobStatus.QUEUED,
-            summary="AI extraction and factual verification queued."
-        )
-        db.add(job)
-        db.flush()
+        job = None
+        if job_id:
+            job = db.query(AIReviewJob).filter(AIReviewJob.id == job_id).first()
+
+        if not job:
+            # Check for existing job in progress to guarantee idempotency
+            existing_active = (
+                db.query(AIReviewJob)
+                .filter(
+                    AIReviewJob.course_id == course.id,
+                    AIReviewJob.status.in_([AIJobStatus.QUEUED, AIJobStatus.PROCESSING, AIJobStatus.EXTRACTING, AIJobStatus.VERIFYING])
+                )
+                .first()
+            )
+            if existing_active:
+                job = existing_active
+            else:
+                job = AIReviewJob(
+                    course_id=course.id,
+                    status=AIJobStatus.QUEUED,
+                    summary="AI extraction and factual verification queued."
+                )
+                db.add(job)
+                db.flush()
 
         # Update status to EXTRACTING & VERIFYING
         job.status = AIJobStatus.VERIFYING
         db.commit()
+
+        # Clear existing findings for this job if this is a rerun
+        db.query(AIFinding).filter(AIFinding.job_id == job.id).delete()
+        db.flush()
 
         try:
             # 2. Gather assets associated with the course

@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 class PDFExtractor(BaseExtractor):
     """
     Extracts text from PDF documents page by page using PyMuPDF (fitz).
-    Handles encrypted or unreadable files gracefully.
+    Handles encrypted, empty, oversized, or unreadable files gracefully.
     """
 
     def can_handle(self, file_name: str, mime_type: str) -> bool:
@@ -17,20 +17,21 @@ class PDFExtractor(BaseExtractor):
         return lower.endswith(".pdf") or "pdf" in mime_type.lower()
 
     def extract(self, file_path: str, asset_id: str, asset_name: str) -> List[ContentSegment]:
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"PDF file not found at path: {file_path}")
+        is_valid, err = self.validate_file(file_path)
+        if not is_valid:
+            return [self.make_error_segment(asset_id, asset_name, err or "Invalid PDF file")]
 
         try:
             import fitz  # PyMuPDF
         except ImportError:
-            logger.warning("PyMuPDF (fitz) is not installed. Falling back to plain text extraction if possible.")
-            return []
+            logger.warning("PyMuPDF (fitz) is not installed.")
+            return [self.make_error_segment(asset_id, asset_name, "PyMuPDF library not available")]
 
         segments: List[ContentSegment] = []
         try:
             doc = fitz.open(file_path)
             if doc.is_encrypted:
-                logger.error(f"PDF {file_name} is password protected/encrypted.")
+                logger.error(f"PDF {asset_name} is password protected/encrypted.")
                 return [
                     ContentSegment(
                         asset_id=asset_id,
@@ -43,13 +44,16 @@ class PDFExtractor(BaseExtractor):
                 ]
 
             total_pages = len(doc)
+            if total_pages == 0:
+                doc.close()
+                return [self.make_error_segment(asset_id, asset_name, "PDF contains zero pages")]
+
             for page_index in range(total_pages):
                 page = doc.load_page(page_index)
                 page_text = page.get_text("text").strip()
                 page_num = page_index + 1
 
                 if not page_text:
-                    # Note potential scanned page
                     page_text = f"[Scanned/Image page without embedded text layer: Page {page_num}]"
 
                 segment = ContentSegment(
@@ -69,15 +73,6 @@ class PDFExtractor(BaseExtractor):
             doc.close()
         except Exception as e:
             logger.error(f"Error extracting PDF {file_path}: {str(e)}", exc_info=True)
-            segments.append(
-                ContentSegment(
-                    asset_id=asset_id,
-                    segment_index=0,
-                    location_type=LocationType.GLOBAL,
-                    location_value="Extraction Error",
-                    text=f"[Extraction Failure: {str(e)}]",
-                    metadata={"error": str(e), "asset_name": asset_name}
-                )
-            )
+            segments.append(self.make_error_segment(asset_id, asset_name, str(e)))
 
         return segments
