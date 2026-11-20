@@ -22,7 +22,7 @@ function Queue() {
       <PageHeader eyebrow="Faculty review" title="Review queue" subtitle={user!.role === "admin" ? "All submissions. Assign reviewers from the Admin dashboard." : "Courses assigned to you."} />
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <div className="flex flex-wrap gap-2" role="tablist">
-          {filters.map((x) => <button key={x} role="tab" aria-selected={f === x} onClick={() => setF(x)} className={`rounded-full border px-3 py-1 text-sm font-semibold ${f === x ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"}`}>{x === "all" ? "All" : statusLabel[x]} ({(x === "all" ? mine : mine.filter((s) => s.status === x)).length})</button>)}
+          {filters.map((x) => <button key={x} role="tab" aria-selected={f === x} onClick={() => setF(x)} className={`inline-flex min-h-10 items-center rounded-full border px-4 text-sm font-semibold ${f === x ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"}`}>{x === "all" ? "All" : statusLabel[x]} ({(x === "all" ? mine : mine.filter((s) => s.status === x)).length})</button>)}
         </div>
         <div className="mt-6">
           {!rows.length ? <Empty title="Nothing here" body="No submissions match this filter." /> : (

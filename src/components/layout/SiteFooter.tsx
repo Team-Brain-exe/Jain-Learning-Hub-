@@ -36,7 +36,9 @@ export function SiteFooter() {
         <div className="space-y-2.5">
           <p className={h}>Contact</p>
           <p className="text-sm text-muted-foreground">Faculty of Engineering and Technology<br />JAIN (Deemed-to-be University)<br />Bengaluru, Karnataka</p>
-          <p className="text-sm text-muted-foreground">learninghub@example.edu (placeholder)</p>
+          <p className="text-sm break-words text-muted-foreground">
+            learninghub@example.edu (placeholder)
+          </p>
         </div>
       </div>
       <div className="border-t border-border">

@@ -36,7 +36,7 @@ function Builder() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <Link to="/creator" className="text-sm font-semibold text-primary">← Creator Studio</Link>
+      <Link to="/creator" className="inline-flex min-h-10 items-center text-sm font-semibold text-primary">← Creator Studio</Link>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-extrabold tracking-tight">{sub.title || "Untitled course"}</h1>
         <StatusBadge status={sub.status} />
