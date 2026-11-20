@@ -37,3 +37,16 @@ class CertificatePublicVerification(BaseModel):
     issued_at: datetime
     university: str = "JAIN (Deemed-to-be University) - Faculty of Engineering & Technology"
 
+class CertificateEligibilityResponse(BaseModel):
+    course_id: str
+    is_enrolled: bool
+    total_lessons: int
+    completed_lessons: int
+    lessons_completed: bool
+    has_quiz: bool
+    quiz_passed: bool
+    is_eligible_for_completion_cert: bool
+    is_eligible_for_peer_educator_cert: bool
+    existing_completion_certificate_code: Optional[str] = None
+    existing_peer_educator_certificate_code: Optional[str] = None
+

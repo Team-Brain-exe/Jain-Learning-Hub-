@@ -25,7 +25,90 @@ from app.core.auth_guards import (
 
 router = APIRouter(tags=["Learning & Progress"])
 
+def sync_enrollment_completion(
+    db: Session,
+    enrollment: Enrollment,
+    course_id: str,
+    student_id: str
+):
+    """
+    Evaluates whether student has completed both required lessons and passing quiz.
+    Maintains enrollment.completed_at accurately regardless of completion order.
+    """
+    all_lessons = (
+        db.query(Lesson)
+        .join(Module, Lesson.module_id == Module.id)
+        .filter(Module.course_id == course_id)
+        .all()
+    )
+    total_lessons = len(all_lessons)
+    lesson_ids = [l.id for l in all_lessons]
+
+    completed_count = 0
+    if lesson_ids:
+        completed_count = db.query(LessonProgress).filter(
+            LessonProgress.student_id == student_id,
+            LessonProgress.lesson_id.in_(lesson_ids),
+            LessonProgress.is_completed == True
+        ).count()
+
+    lessons_done = (total_lessons > 0 and completed_count == total_lessons)
+
+    quiz = db.query(Quiz).filter(Quiz.course_id == course_id).first()
+    if quiz:
+        passed_attempt = db.query(QuizAttempt).filter(
+            QuizAttempt.student_id == student_id,
+            QuizAttempt.quiz_id == quiz.id,
+            QuizAttempt.passed == True
+        ).first()
+        quiz_done = bool(passed_attempt)
+    else:
+        quiz_done = True
+
+    if lessons_done and quiz_done:
+        if not enrollment.completed_at:
+            enrollment.completed_at = datetime.now(timezone.utc)
+    else:
+        enrollment.completed_at = None
+
 # ----------------- ENROLLMENT -----------------
+
+@router.get("/api/enrollments/me", response_model=List[EnrollmentResponse])
+def get_my_enrollments(
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_role("student"))
+):
+    """
+    Returns active course enrollments for the logged-in student.
+    """
+    return (
+        db.query(Enrollment)
+        .filter(Enrollment.student_id == user.id)
+        .order_by(Enrollment.enrolled_at.desc())
+        .all()
+    )
+
+@router.get("/api/courses/{id}/enrollment", response_model=EnrollmentResponse)
+def get_course_enrollment(
+    id: str,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_role("student"))
+):
+    """
+    Checks if student is enrolled in a specific course.
+    """
+    enrollment = db.query(Enrollment).filter(
+        Enrollment.student_id == user.id,
+        Enrollment.course_id == id
+    ).first()
+
+    if not enrollment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Student is not enrolled in this course."
+        )
+
+    return enrollment
 
 @router.post("/api/courses/{id}/enroll", response_model=EnrollmentResponse)
 def enroll_in_course(
@@ -86,6 +169,9 @@ def update_lesson_progress(
 
     # Verify student is enrolled in the parent course
     module = db.query(Module).filter(Module.id == lesson.module_id).first()
+    if not module:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lesson module not found.")
+
     enrollment = db.query(Enrollment).filter(
         Enrollment.student_id == user.id,
         Enrollment.course_id == module.course_id
@@ -115,6 +201,11 @@ def update_lesson_progress(
         progress.is_completed = payload.is_completed
         progress.completed_at = now if payload.is_completed else None
 
+    db.flush()
+
+    # Sync enrollment completion status
+    sync_enrollment_completion(db, enrollment, module.course_id, user.id)
+
     db.commit()
     db.refresh(progress)
     return progress
@@ -127,10 +218,22 @@ def get_course_progress(
 ):
     """
     Returns student's overall lesson completion percentage for a course.
+    Enforces active enrollment check.
     """
     course = db.query(Course).filter(Course.id == id).first()
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found.")
+
+    enrollment = db.query(Enrollment).filter(
+        Enrollment.student_id == user.id,
+        Enrollment.course_id == course.id
+    ).first()
+
+    if not enrollment:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: You must be enrolled in this course to view progress."
+        )
 
     # Calculate total lessons in course
     all_lessons = (
@@ -142,39 +245,69 @@ def get_course_progress(
     total_lessons = len(all_lessons)
     lesson_ids = [l.id for l in all_lessons]
 
-    # Calculate completed lessons
+    # Calculate completed lessons and fetch completed lesson IDs
     completed_count = 0
+    completed_ids = []
     if lesson_ids:
-        completed_count = db.query(LessonProgress).filter(
+        completed_records = db.query(LessonProgress).filter(
             LessonProgress.student_id == user.id,
             LessonProgress.lesson_id.in_(lesson_ids),
             LessonProgress.is_completed == True
-        ).count()
+        ).all()
+        completed_count = len(completed_records)
+        completed_ids = [r.lesson_id for r in completed_records]
 
     progress_percentage = (completed_count / total_lessons * 100.0) if total_lessons > 0 else 0.0
+
+    quiz = db.query(Quiz).filter(Quiz.course_id == course.id).first()
+    is_quiz_passed = False
+    if quiz:
+        passed_attempt = db.query(QuizAttempt).filter(
+            QuizAttempt.student_id == user.id,
+            QuizAttempt.quiz_id == quiz.id,
+            QuizAttempt.passed == True
+        ).first()
+        is_quiz_passed = bool(passed_attempt)
 
     return CourseProgressOverview(
         course_id=course.id,
         total_lessons=total_lessons,
         completed_lessons=completed_count,
         progress_percentage=round(progress_percentage, 1),
-        is_course_completed=(completed_count == total_lessons and total_lessons > 0)
+        is_course_completed=(completed_count == total_lessons and total_lessons > 0),
+        completed_lesson_ids=completed_ids,
+        is_quiz_passed=is_quiz_passed
     )
 
 # ----------------- QUIZ & ANTI-FORGERY EVALUATION -----------------
 
-@router.get("/api/quizzes/{id}", response_model=QuizDetailResponse)
-def get_quiz_details(
+@router.get("/api/courses/{id}/quiz", response_model=QuizDetailResponse)
+def get_course_quiz(
     id: str,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Retrieves quiz questions without revealing correct answer indices.
+    Retrieves the quiz configured for a course without exposing answer keys.
     """
-    quiz = db.query(Quiz).filter(Quiz.id == id).first()
+    course = db.query(Course).filter(Course.id == id).first()
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found.")
+
+    quiz = db.query(Quiz).filter(Quiz.course_id == course.id).first()
     if not quiz:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No quiz configured for this course.")
+
+    if user.role == "student":
+        enrollment = db.query(Enrollment).filter(
+            Enrollment.student_id == user.id,
+            Enrollment.course_id == course.id
+        ).first()
+        if not enrollment:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: You must be enrolled in this course to view the quiz."
+            )
 
     public_questions = []
     for q in quiz.questions:
@@ -196,6 +329,89 @@ def get_quiz_details(
         questions=public_questions
     )
 
+@router.get("/api/quizzes/{id}", response_model=QuizDetailResponse)
+def get_quiz_details(
+    id: str,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Retrieves quiz questions without revealing correct answer indices.
+    """
+    quiz = db.query(Quiz).filter(Quiz.id == id).first()
+    if not quiz:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found.")
+
+    if user.role == "student":
+        enrollment = db.query(Enrollment).filter(
+            Enrollment.student_id == user.id,
+            Enrollment.course_id == quiz.course_id
+        ).first()
+        if not enrollment:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: You must be enrolled in this course to view the quiz."
+            )
+
+    public_questions = []
+    for q in quiz.questions:
+        options = json.loads(q.options_json)
+        public_questions.append(
+            QuizQuestionPublic(
+                id=q.id,
+                question_text=q.question_text,
+                options=options,
+                order_index=q.order_index
+            )
+        )
+
+    return QuizDetailResponse(
+        id=quiz.id,
+        course_id=quiz.course_id,
+        title=quiz.title,
+        passing_score_percentage=quiz.passing_score_percentage,
+        questions=public_questions
+    )
+
+@router.get("/api/quizzes/{id}/attempts", response_model=List[QuizAttemptResponse])
+def get_quiz_attempts(
+    id: str,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_role("student"))
+):
+    """
+    Retrieves historical attempts for this quiz by the current student.
+    """
+    quiz = db.query(Quiz).filter(Quiz.id == id).first()
+    if not quiz:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found.")
+
+    attempts = (
+        db.query(QuizAttempt)
+        .filter(QuizAttempt.quiz_id == quiz.id, QuizAttempt.student_id == user.id)
+        .order_by(QuizAttempt.attempted_at.desc())
+        .all()
+    )
+
+    total_questions = len(quiz.questions)
+    res = []
+    for a in attempts:
+        correct_count = round((a.score_percentage / 100.0) * total_questions) if total_questions > 0 else 0
+        res.append(
+            QuizAttemptResponse(
+                id=a.id,
+                quiz_id=a.quiz_id,
+                student_id=a.student_id,
+                total_questions=total_questions,
+                correct_answers=correct_count,
+                score_percentage=a.score_percentage,
+                passed=a.passed,
+                passing_score_percentage=quiz.passing_score_percentage,
+                attempted_at=a.attempted_at
+            )
+        )
+    return res
+
 @router.post("/api/quizzes/{id}/attempts", response_model=QuizAttemptResponse)
 def submit_quiz_attempt(
     id: str,
@@ -205,7 +421,7 @@ def submit_quiz_attempt(
 ):
     """
     Evaluates student quiz submission against correct answers and passing threshold.
-    Prevents forged completion; answers are checked on the server side.
+    Prevents forged completion; answers are checked on the server side with deduplication.
     """
     quiz = db.query(Quiz).filter(Quiz.id == id).first()
     if not quiz:
@@ -227,10 +443,16 @@ def submit_quiz_attempt(
     if not questions:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Quiz has no questions configured.")
 
-    correct_count = 0
+    # Anti-forgery: Deduplicate answers per question_id and ignore submitted IDs not in this quiz
+    deduped_answers = {}
     for submission in payload.answers:
-        q = questions.get(submission.question_id)
-        if q and q.correct_option_index == submission.selected_option_index:
+        if submission.question_id in questions:
+            deduped_answers[submission.question_id] = submission.selected_option_index
+
+    correct_count = 0
+    for q_id, selected_idx in deduped_answers.items():
+        q = questions[q_id]
+        if q.correct_option_index == selected_idx:
             correct_count += 1
 
     total_questions = len(questions)
@@ -244,27 +466,10 @@ def submit_quiz_attempt(
         passed=passed
     )
     db.add(attempt)
+    db.flush()
 
-    # If passed and all lessons are complete, record enrollment completion timestamp
-    if passed:
-        all_lessons = (
-            db.query(Lesson)
-            .join(Module, Lesson.module_id == Module.id)
-            .filter(Module.course_id == quiz.course_id)
-            .all()
-        )
-        total_lessons = len(all_lessons)
-        lesson_ids = [l.id for l in all_lessons]
-        completed_lessons = 0
-        if lesson_ids:
-            completed_lessons = db.query(LessonProgress).filter(
-                LessonProgress.student_id == user.id,
-                LessonProgress.lesson_id.in_(lesson_ids),
-                LessonProgress.is_completed == True
-            ).count()
-
-        if completed_lessons == total_lessons:
-            enrollment.completed_at = datetime.now(timezone.utc)
+    # Sync enrollment completion status
+    sync_enrollment_completion(db, enrollment, quiz.course_id, user.id)
 
     db.commit()
     db.refresh(attempt)

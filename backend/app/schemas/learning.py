@@ -30,6 +30,8 @@ class CourseProgressOverview(BaseModel):
     completed_lessons: int
     progress_percentage: float
     is_course_completed: bool
+    completed_lesson_ids: List[str] = []
+    is_quiz_passed: bool = False
 
 # ----------------- QUIZ SCHEMAS -----------------
 class QuizQuestionPublic(BaseModel):
