@@ -70,6 +70,47 @@ class ContentVerifier:
 
         claim_lower = claim.lower()
 
+        # ---------------- Check 0: Adversarial Instruction & Untrusted Content Defense ----------------
+        adversarial_indicators = [
+            "ignore previous instructions",
+            "override system",
+            "bypass review",
+            "system prompt:",
+            "approve this course",
+            "disregard all guidelines",
+            "auto-publish",
+            "grant 100/100"
+        ]
+        if any(adv in claim_lower for adv in adversarial_indicators):
+            return VerifiedFinding(
+                id=f"fnd-sec-{uuid.uuid4().hex[:8]}",
+                finding_type=ClaimAssessmentType.POTENTIAL_ERROR,
+                severity=FindingSeverity.HIGH,
+                claim=claim,
+                source_location=src_loc,
+                explanation="Adversarial instruction pattern detected in uploaded material. The system treats all asset text as untrusted data and routes it for mandatory human review.",
+                suggested_correction="Remove system prompt injection attempts or unauthorized control instructions from course materials.",
+                references=[],
+                requires_human_review=True,
+                confidence=0.99
+            )
+
+        # Ambiguity / Uncertainty Detection
+        uncertainty_indicators = ["it is debated whether", "unclear whether", "some claim while others dispute", "uncertain whether", "cannot be definitively proven"]
+        if any(unc in claim_lower for unc in uncertainty_indicators):
+            return VerifiedFinding(
+                id=f"fnd-unc-{uuid.uuid4().hex[:8]}",
+                finding_type=ClaimAssessmentType.UNCERTAIN,
+                severity=FindingSeverity.LOW,
+                claim=claim,
+                source_location=src_loc,
+                explanation="Claim addresses an academically debated or ambiguous concept. Surfaced for faculty qualitative judgment.",
+                suggested_correction="Clarify context or present multiple academic perspectives.",
+                references=[retrieved[0][0]] if retrieved else [],
+                requires_human_review=True,
+                confidence=0.50
+            )
+
         # ---------------- Check 1: Known Academic Contradictions / Errors ----------------
         # Pattern A: Python execution oversimplifications
         if "python" in claim_lower and ("compiled-only" in claim_lower or "purely compiled" in claim_lower or "compiled language only" in claim_lower):

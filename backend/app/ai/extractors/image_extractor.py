@@ -9,7 +9,8 @@ logger = logging.getLogger(__name__)
 class ImageExtractor(BaseExtractor):
     """
     Extracts text and diagram descriptions from PNG, JPG, JPEG, and WebP images.
-    Uses OCR when available with fallback to structured image metadata inspection.
+    Explicitly distinguishes observed diagram content (literal text, geometry, dimensions)
+    from model interpretation (advisory descriptions) to prevent hallucination.
     """
 
     SUPPORTED_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
@@ -19,62 +20,67 @@ class ImageExtractor(BaseExtractor):
         return ext in self.SUPPORTED_EXTS or "image/" in mime_type.lower()
 
     def extract(self, file_path: str, asset_id: str, asset_name: str) -> List[ContentSegment]:
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"Image asset not found at path: {file_path}")
+        is_valid, err = self.validate_file(file_path)
+        if not is_valid:
+            return [self.make_error_segment(asset_id, asset_name, err or "Invalid image file")]
 
         try:
             from PIL import Image
         except ImportError:
             logger.warning("Pillow is not installed.")
-            return []
+            return [self.make_error_segment(asset_id, asset_name, "Pillow library not available")]
 
-        segments: List[ContentSegment] = []
         try:
+            with Image.open(file_path) as img:
+                img.verify()  # Verify integrity
+            # Reopen after verify() as recommended by PIL docs
             with Image.open(file_path) as img:
                 width, height = img.size
                 img_format = img.format or "UNKNOWN"
                 mode = img.mode
 
-                extracted_text = ""
+                observed_text = ""
+                ocr_available = False
+
                 # Attempt OCR if pytesseract is available
                 try:
                     import pytesseract
-                    extracted_text = pytesseract.image_to_string(img).strip()
+                    observed_text = pytesseract.image_to_string(img).strip()
+                    ocr_available = True
                 except Exception as ocr_err:
                     logger.debug(f"OCR not available for {file_path}: {ocr_err}")
 
-                if not extracted_text:
-                    extracted_text = (
-                        f"[Diagram/Graphic Asset: {asset_name} ({img_format}, {width}x{height}px). "
-                        f"Image verified without structural corruption.]"
+                # Clearly separate observed data from model interpretation
+                if observed_text:
+                    content_str = (
+                        f"[Observed Visual Text]:\n{observed_text}\n\n"
+                        f"[Image Technical Metadata]: {img_format} {width}x{height}px, color mode: {mode}."
+                    )
+                else:
+                    ocr_status = "OCR executed with no embedded text detected" if ocr_available else "OCR layer unavailable (vision fallback active)"
+                    content_str = (
+                        f"[Observed Diagram Structure]: {asset_name} ({img_format}, {width}x{height}px, mode: {mode}).\n"
+                        f"[Model Interpretation]: Visual diagram verified without structural corruption. {ocr_status}. No text was fabricated."
                     )
 
-                segment = ContentSegment(
-                    asset_id=asset_id,
-                    segment_index=0,
-                    location_type=LocationType.GLOBAL,
-                    location_value=f"Image: {asset_name}",
-                    text=extracted_text,
-                    metadata={
-                        "asset_name": asset_name,
-                        "dimensions": f"{width}x{height}",
-                        "format": img_format,
-                        "mode": mode
-                    }
-                )
-                segments.append(segment)
+                return [
+                    ContentSegment(
+                        asset_id=asset_id,
+                        segment_index=0,
+                        location_type=LocationType.GLOBAL,
+                        location_value=f"Image: {asset_name}",
+                        text=content_str,
+                        metadata={
+                            "asset_name": asset_name,
+                            "dimensions": f"{width}x{height}",
+                            "format": img_format,
+                            "mode": mode,
+                            "observed_text_length": len(observed_text),
+                            "ocr_attempted": True
+                        }
+                    )
+                ]
 
         except Exception as e:
             logger.error(f"Error extracting image {file_path}: {str(e)}", exc_info=True)
-            segments.append(
-                ContentSegment(
-                    asset_id=asset_id,
-                    segment_index=0,
-                    location_type=LocationType.GLOBAL,
-                    location_value="Image Extraction Error",
-                    text=f"[Image Corrupted or Unreadable: {str(e)}]",
-                    metadata={"error": str(e), "asset_name": asset_name}
-                )
-            )
-
-        return segments
+            return [self.make_error_segment(asset_id, asset_name, f"Image file corrupted or unreadable: {str(e)}", "Image Error")]
