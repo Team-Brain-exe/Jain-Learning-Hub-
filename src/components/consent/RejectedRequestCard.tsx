@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { AlertCircle } from "lucide-react";
 
 import { UploadPermissionBadge } from "@/components/consent/UploadPermissionBadge";
@@ -19,10 +20,14 @@ export function RejectedRequestCard({
 }: RejectedRequestCardProps) {
   const remarks = permission.facultyRemarks?.trim();
   const hasRemarks = Boolean(remarks);
+  const titleId = useId();
 
   return (
     <Alert
       variant="destructive"
+      // Static content: a labelled region, not role="alert" (which screen readers announce on load).
+      role="region"
+      aria-labelledby={titleId}
       className={cn(
         "rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-foreground shadow-sm",
         className,
@@ -34,7 +39,10 @@ export function RejectedRequestCard({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 shrink-0 text-destructive" aria-hidden="true" />
-              <AlertTitle className="m-0 text-base font-bold text-foreground break-words">
+              <AlertTitle
+                id={titleId}
+                className="m-0 text-base font-bold text-foreground break-words"
+              >
                 {permission.title}
               </AlertTitle>
             </div>
@@ -73,7 +81,7 @@ export function RejectedRequestCard({
             onClick={() => onReviseRequest(permission)}
             className={cn(
               btnOutline,
-              "w-full sm:w-auto text-destructive border-destructive/40 hover:bg-destructive/10",
+              "w-full sm:w-auto text-foreground border-destructive/40 hover:bg-destructive/10",
             )}
           >
             Submit revised request
