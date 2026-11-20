@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useRef, useState } from "react";
 import type { Quiz, QuizQuestion } from "@/data/platform";
 import type { ProctorConfig } from "@/data/proctoring";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -46,6 +46,37 @@ function SwitchRow({
   );
 }
 
+/** Number input that holds a free-typed draft and commits the clamped value on blur or Enter. */
+function ClampedNumber({
+  value,
+  min,
+  max,
+  onCommit,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  onCommit: (v: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft !== null) onCommit(clamp(draft, min, max));
+    setDraft(null);
+  };
+  return (
+    <input
+      type="number"
+      min={min}
+      max={max}
+      className={input}
+      value={draft ?? value}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => e.key === "Enter" && commit()}
+    />
+  );
+}
+
 /** Quiz-level exam-mode switch and proctor settings. Renders nothing extra when exam mode is off. */
 export function ExamModeSettings({
   quiz,
@@ -64,30 +95,28 @@ export function ExamModeSettings({
         hint="Opens in a new tab with a timer, fullscreen and tab-switch recording."
         checked={!!p}
         onChange={(on) =>
-          on ? setQuiz({ proctor: { ...DEFAULT_PROCTOR } }) : updateOff(quiz, setQuiz)
+          on
+            ? setQuiz({ proctor: { ...DEFAULT_PROCTOR } })
+            : setQuiz({ proctor: undefined, questions: examModeOff(quiz).questions })
         }
       />
       {p && (
         <>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Duration (minutes)">
-              <input
-                type="number"
+              <ClampedNumber
                 min={5}
                 max={180}
-                className={input}
                 value={p.durationMinutes}
-                onChange={(e) => setP({ durationMinutes: clamp(e.target.value, 5, 180) })}
+                onCommit={(v) => setP({ durationMinutes: v })}
               />
             </Field>
             <Field label="Max warnings before auto-submit">
-              <input
-                type="number"
+              <ClampedNumber
                 min={1}
                 max={10}
-                className={input}
                 value={p.maxViolations}
-                onChange={(e) => setP({ maxViolations: clamp(e.target.value, 1, 10) })}
+                onCommit={(v) => setP({ maxViolations: v })}
               />
             </Field>
           </div>
@@ -115,12 +144,6 @@ export function ExamModeSettings({
   );
 }
 
-// Turning exam mode off drops the proctor config and normalises question types in one write.
-function updateOff(quiz: Quiz, setQuiz: (p: Partial<Quiz>) => void) {
-  const off = examModeOff(quiz);
-  setQuiz({ proctor: undefined, questions: off.questions });
-}
-
 const TYPES: { value: QuestionType; label: string }[] = [
   { value: "single", label: "Single choice" },
   { value: "multi", label: "Multiple choice" },
@@ -135,13 +158,16 @@ export function ExamQuestionFields({
   q: QuizQuestion;
   onChange: (next: QuizQuestion) => void;
 }) {
+  // Options authored before switching to true/false, so switching back does not lose them.
+  const stash = useRef<string[] | undefined>(undefined);
+  const changeType = (type: QuestionType) => {
+    if (type === "truefalse" && q.type !== "truefalse") stash.current = q.options;
+    onChange(setQuestionType(q, type, stash.current));
+  };
   return (
     <div className="mt-3 grid gap-3 sm:grid-cols-2">
       <Field label="Question type">
-        <Select
-          value={q.type ?? "single"}
-          onValueChange={(v) => onChange(setQuestionType(q, v as QuestionType))}
-        >
+        <Select value={q.type ?? "single"} onValueChange={(v) => changeType(v as QuestionType)}>
           <SelectTrigger className="mt-1">
             <SelectValue />
           </SelectTrigger>
@@ -159,7 +185,9 @@ export function ExamQuestionFields({
           className={input}
           placeholder="e.g. A · Basics"
           value={q.section ?? ""}
-          onChange={(e) => onChange({ ...q, section: e.target.value })}
+          onChange={(e) =>
+            onChange({ ...q, section: e.target.value.trim() ? e.target.value : undefined })
+          }
         />
       </Field>
     </div>
@@ -196,7 +224,7 @@ export function ExamOptions({
   return (
     <>
       <div className="mt-3 space-y-2" role="group" aria-label="Options (tick every correct one)">
-        {q.options.map((o, oi): ReactNode => (
+        {q.options.map((o, oi) => (
           <div key={oi} className="flex items-center gap-2">
             <Checkbox
               aria-label={`Option ${oi + 1} is correct`}

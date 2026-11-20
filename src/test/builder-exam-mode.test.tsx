@@ -62,10 +62,21 @@ describe("QuizTab exam mode", () => {
       shuffleOptions: false,
     });
     expect(screen.getByLabelText(/Duration \(minutes\)/)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/Duration \(minutes\)/), { target: { value: "500" } });
+    const dur = screen.getByLabelText(/Duration \(minutes\)/);
+    fireEvent.change(dur, { target: { value: "3" } });
+    expect(dur).toHaveValue(3); // not clamped while typing
+    fireEvent.change(dur, { target: { value: "30" } });
+    fireEvent.blur(dur);
+    expect(lastQuiz().proctor.durationMinutes).toBe(30);
+    fireEvent.change(dur, { target: { value: "999" } });
+    fireEvent.blur(dur);
     expect(lastQuiz().proctor.durationMinutes).toBe(180);
-    fireEvent.change(screen.getByLabelText(/Max warnings/), { target: { value: "0" } });
+    const warn = screen.getByLabelText(/Max warnings/);
+    fireEvent.change(warn, { target: { value: "0" } });
+    fireEvent.keyDown(warn, { key: "Enter" });
     expect(lastQuiz().proctor.maxViolations).toBe(1);
+    fireEvent.click(screen.getByRole("switch", { name: "Shuffle questions" }));
+    expect(lastQuiz().proctor.shuffleQuestions).toBe(true);
   });
 
   it("multi: ticking options 1 and 3 stores correctAll [0,2] and correct 0; off converts to single", () => {
@@ -93,6 +104,47 @@ describe("QuizTab exam mode", () => {
     expect(screen.queryByPlaceholderText("Option 1")).toBeNull();
     fireEvent.click(screen.getByRole("radio", { name: "False" }));
     expect(lastQuiz().questions[0].correct).toBe(1);
+  });
+});
+
+describe("QuizTab type switching", () => {
+  const pick = (name: string) => {
+    fireEvent.click(screen.getByRole("combobox", { name: /Question type/ }));
+    fireEvent.click(screen.getByRole("option", { name }));
+  };
+  it("single -> true/false -> single restores the original options", () => {
+    render(<Harness initial={mk({ passMark: 70, maxAttempts: 3, proctor, questions: [q()] })} />);
+    pick("True or false");
+    pick("Single choice");
+    expect(lastQuiz().questions[0].options).toEqual(["a", "b", "c", "d"]);
+  });
+  it("multi -> true/false -> multi restores options; true/false -> multi gives four", () => {
+    render(<Harness initial={mk({ passMark: 70, maxAttempts: 3, proctor, questions: [q()] })} />);
+    pick("Multiple choice");
+    pick("True or false");
+    pick("Multiple choice");
+    expect(lastQuiz().questions[0].options).toEqual(["a", "b", "c", "d"]);
+    cleanup();
+    render(
+      <Harness
+        initial={mk({
+          passMark: 70,
+          maxAttempts: 3,
+          proctor,
+          questions: [q({ type: "truefalse", options: ["True", "False"] })],
+        })}
+      />,
+    );
+    pick("Multiple choice");
+    expect(lastQuiz().questions[0].options).toEqual(["", "", "", ""]);
+  });
+  it("section input stores its value and clears to undefined", () => {
+    render(<Harness initial={mk({ passMark: 70, maxAttempts: 3, proctor, questions: [q()] })} />);
+    const sec = screen.getByLabelText("Section");
+    fireEvent.change(sec, { target: { value: "A · Basics" } });
+    expect(lastQuiz().questions[0].section).toBe("A · Basics");
+    fireEvent.change(sec, { target: { value: "" } });
+    expect(lastQuiz().questions[0].section).toBeUndefined();
   });
 });
 

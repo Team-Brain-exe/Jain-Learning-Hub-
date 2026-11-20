@@ -19,24 +19,29 @@ const withoutMulti = (q: QuizQuestion): QuizQuestion => {
   return rest;
 };
 
-/** Change a question's type, keeping `correct` valid for the new shape. */
-export function setQuestionType(q: QuizQuestion, type: QuestionType): QuizQuestion {
-  if (type === "multi") {
-    return { ...q, type, correctAll: q.correctAll?.length ? q.correctAll : [q.correct] };
-  }
-  const base = withoutMulti(q);
-  if (type === "truefalse")
-    return { ...base, type, options: ["True", "False"], correct: q.correct === 1 ? 1 : 0 };
+/**
+ * Change a question's type, keeping `correct` valid for the new shape.
+ * `stashed` are the options saved when the question was switched to true/false;
+ * they are restored when leaving it (otherwise four blanks, so validation prompts the author).
+ */
+export function setQuestionType(
+  q: QuizQuestion,
+  type: QuestionType,
+  stashed?: string[],
+): QuizQuestion {
+  const wasTf = q.type === "truefalse";
   const options =
-    q.options.length >= 4
-      ? q.options
-      : [...q.options, ...Array<string>(4 - q.options.length).fill("")];
-  return {
-    ...base,
-    type,
-    options,
-    correct: q.type === "multi" ? (q.correctAll?.[0] ?? 0) : q.correct,
-  };
+    type === "truefalse"
+      ? ["True", "False"]
+      : wasTf
+        ? (stashed ?? ["", "", "", ""])
+        : q.options.length >= 4
+          ? q.options
+          : [...q.options, ...Array<string>(4 - q.options.length).fill("")];
+  const from = q.type === "multi" ? (q.correctAll?.[0] ?? 0) : q.correct;
+  const correct = type === "truefalse" ? (from === 1 ? 1 : 0) : from < options.length ? from : 0;
+  if (type === "multi") return { ...q, type, options, correct, correctAll: [correct] };
+  return { ...withoutMulti(q), type, options, correct };
 }
 
 /** Toggle option `i` as correct on a multi question; `correct` mirrors the first selected (0 if none). */
