@@ -427,3 +427,14 @@ export function resumeExam(slug: string, userId: string, quiz: Quiz): ExamSessio
   if (JSON.stringify(r) !== JSON.stringify(s)) commit({ ...all, [key]: r });
   return r;
 }
+
+/** Candidate-facing sentence for each violation type (warning dialog). */
+export const TYPE_LABEL: Record<ViolationType, string> = {
+  tab_hidden: "You left the exam tab.",
+  window_blur: "The exam window lost focus.",
+  fullscreen_exit: "You exited fullscreen.",
+  copy_paste: "Copying or pasting was detected.",
+  context_menu: "Right-click was detected.",
+  second_tab: "The exam was opened in another tab.",
+  fullscreen_unsupported: "Fullscreen isn't available on this device.",
+};
