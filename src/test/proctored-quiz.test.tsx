@@ -8,8 +8,8 @@ import {
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { platform, submitAttempt } from "@/data/platform";
-import { examSessions } from "@/data/proctoring";
+import { getQuiz, platform, submitAttempt } from "@/data/platform";
+import { examSessions, sessionKey, startExam } from "@/data/proctoring";
 import { signInDemo, signOut } from "@/hooks/use-auth";
 import { Route as ExamRoute } from "@/routes/learn.$slug.exam";
 import { Route as QuizRoute } from "@/routes/learn.$slug.quiz";
@@ -132,5 +132,88 @@ describe("proctored quiz entry and exam route", () => {
     await renderAt(`/learn/${DSA}/quiz`);
     expect(await screen.findByText("Attempt history")).toBeInTheDocument();
     expect(screen.getByText("⚠ 1")).toBeInTheDocument();
+  });
+
+  describe("attempt limits and sessions", () => {
+    const creator = () => platform.get().users.find((u) => u.id === "u-creator")!;
+    const dsa = () => getQuiz(DSA)!;
+    const useAttempts = (n: number) => {
+      for (let i = 0; i < n; i++) submitAttempt(creator(), DSA, {});
+    };
+    const startSession = () => {
+      const s = startExam(creator(), DSA, dsa(), "tab-other");
+      if (typeof s === "string") throw new Error(s);
+      return s;
+    };
+
+    it("shows No attempts left on the exam route when all attempts are used", async () => {
+      useAttempts(3);
+      await renderAt(`/learn/${DSA}/exam`);
+      expect(await screen.findByText("No attempts left")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /quiz/i })).toHaveAttribute(
+        "href",
+        `/learn/${DSA}/quiz`,
+      );
+      expect(screen.queryByText("Before you begin")).not.toBeInTheDocument();
+    });
+
+    it("disables the quiz card button when all attempts are used", async () => {
+      useAttempts(3);
+      await renderAt(`/learn/${DSA}/quiz`);
+      expect(await screen.findByRole("button", { name: "No attempts left" })).toBeDisabled();
+      expect(screen.queryByRole("link", { name: "Open exam in new tab" })).not.toBeInTheDocument();
+    });
+
+    it("shows the result, not the no-attempts guard, when an expired session uses the last attempt", async () => {
+      useAttempts(2);
+      const s = startSession();
+      const key = sessionKey(DSA, "u-creator");
+      examSessions.set({ [key]: { ...s, deadlineMs: Date.now() - 1000, lastBeat: 0 } });
+      await renderAt(`/learn/${DSA}/exam`);
+      expect(await screen.findByText(/attempt 3 of 3/)).toBeInTheDocument();
+      expect(screen.getByText("Auto-submitted (time ran out)")).toBeInTheDocument();
+      expect(screen.queryByText("No attempts left")).not.toBeInTheDocument();
+    });
+
+    it("labels the quiz card Resume exam, live, once a session exists", async () => {
+      await renderAt(`/learn/${DSA}/quiz`);
+      expect(await screen.findByRole("link", { name: "Open exam in new tab" })).toBeInTheDocument();
+      act(() => {
+        startSession();
+      });
+      expect(screen.getByRole("link", { name: "Resume exam" })).toHaveAttribute(
+        "href",
+        `/learn/${DSA}/exam`,
+      );
+    });
+
+    it("keeps the timer and warnings bar during review; its Submit opens the dialog", async () => {
+      await renderAt(`/learn/${DSA}/exam`);
+      fireEvent.click(await screen.findByRole("checkbox"));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Start proctored exam" }));
+      });
+      fireEvent.click(screen.getAllByRole("button", { name: "Review & submit" })[0]!);
+      expect(screen.getByText("Review your answers")).toBeInTheDocument();
+      expect(screen.getByLabelText("Answered progress")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+      expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    });
+
+    it("ignores option shortcuts while the mobile question sheet is open", async () => {
+      await renderAt(`/learn/${DSA}/exam`);
+      fireEvent.click(await screen.findByRole("checkbox"));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Start proctored exam" }));
+      });
+      const key = sessionKey(DSA, "u-creator");
+      const qid = () => examSessions.get()[key]!.order[examSessions.get()[key]!.current]!;
+      fireEvent.click(screen.getByRole("button", { name: /^▦/ }));
+      fireEvent.keyDown(window, { key: "1" });
+      expect(examSessions.get()[key]!.answers[qid()]).toBeUndefined();
+      fireEvent.keyDown(document.activeElement ?? window, { key: "Escape" });
+      fireEvent.keyDown(window, { key: "1" });
+      expect(examSessions.get()[key]!.answers[qid()]).toBeDefined();
+    });
   });
 });

@@ -100,6 +100,58 @@ describe("exam session store", () => {
     expect(b.optionOrder).toEqual(a.optionOrder);
   });
 
+  it("shuffles within sections only, keeping sections contiguous in quiz order", () => {
+    const sec = (id: string, section?: string) => ({
+      id,
+      prompt: id,
+      options: ["a", "b"],
+      correct: 0,
+      explanation: "",
+      ...(section ? { section } : {}),
+    });
+    const q: Quiz = {
+      passMark: 70,
+      maxAttempts: 3,
+      proctor: {
+        durationMinutes: 2,
+        maxViolations: 3,
+        requireFullscreen: false,
+        shuffleQuestions: true,
+      },
+      questions: [
+        sec("a1", "A"),
+        sec("b1", "B"),
+        sec("a2", "A"),
+        sec("u1"),
+        sec("b2", "B"),
+        sec("a3", "A"),
+        sec("u2"),
+        sec("b3", "B"),
+        sec("a4", "A"),
+      ],
+    };
+    const groupOf = (id: string) => q.questions.find((x) => x.id === id)?.section ?? "Questions";
+    const orders: string[][] = [];
+    for (let i = 0; i < 8; i++) {
+      examSessions.reset();
+      vi.setSystemTime(T0 + i * 1000);
+      const s = begin(user("u-creator"), SLUG, q, "tab-a");
+      expect([...s.order].sort()).toEqual(q.questions.map((x) => x.id).sort());
+      expect(s.order.map(groupOf)).toEqual([
+        ...["A", "A", "A", "A"],
+        ...["B", "B", "B"],
+        ...["Questions", "Questions"],
+      ]);
+      orders.push(s.order);
+      // Same seed (key + startedAt) gives the same order.
+      examSessions.reset();
+      expect(begin(user("u-creator"), SLUG, q, "tab-a").order).toEqual(s.order);
+    }
+    // Within-section order does get shuffled for some seed.
+    const grouped = ["a1", "a2", "a3", "a4", "b1", "b2", "b3", "u1", "u2"];
+    expect(orders.some((o) => o.join() !== grouped.join())).toBe(true);
+  });
+
   it("uses identity order when shuffling is off", () => {
     const base = quiz();
     const q: Quiz = {

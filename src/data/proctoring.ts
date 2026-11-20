@@ -202,6 +202,24 @@ function patch(
 
 const identity = (n: number): number[] => Array.from({ length: n }, (_, i) => i);
 
+/**
+ * Question order for a new session. Sections stay contiguous and in the quiz's order (unsectioned
+ * questions form the "Questions" group where they first appear); with `shuffle`, questions are
+ * shuffled within their own section only, deterministically per seed.
+ */
+function sectionedOrder(quiz: Quiz, shuffle: boolean, seed: string): string[] {
+  const groups = new Map<string, string[]>();
+  for (const q of quiz.questions) {
+    const key = q.section ?? "Questions";
+    const ids = groups.get(key) ?? [];
+    ids.push(q.id);
+    groups.set(key, ids);
+  }
+  return [...groups].flatMap(([section, ids]) =>
+    shuffle ? seededShuffle(ids, `${seed}:section:${section}`) : ids,
+  );
+}
+
 /** → GET /api/exams/:slug/session — a pure read of this tab's view (safe during render). */
 export const getActiveSession = (slug: string, userId: string): ExamSession | undefined =>
   examSessions.get()[sessionKey(slug, userId)];
@@ -234,7 +252,6 @@ export function startExam(
   const now = Date.now();
   const startedAt = new Date(now).toISOString();
   const seed = key + startedAt;
-  const ids = quiz.questions.map((q) => q.id);
   const optionOrder: Record<string, number[]> = {};
   for (const q of quiz.questions) {
     const base = identity(q.options.length);
@@ -247,7 +264,7 @@ export function startExam(
     userId: user.id,
     startedAt,
     deadlineMs: now + effectiveMinutes(cfg, user.timeMultiplier ?? 1) * 60_000,
-    order: cfg.shuffleQuestions ? seededShuffle(ids, seed) : ids,
+    order: sectionedOrder(quiz, !!cfg.shuffleQuestions, seed),
     optionOrder,
     answers: {},
     flagged: [],

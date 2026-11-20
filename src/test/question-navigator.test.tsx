@@ -64,4 +64,27 @@ describe("QuestionNavigator", () => {
     fireEvent.click(screen.getByRole("button", { name: "Review & submit" }));
     expect(onReview).toHaveBeenCalled();
   });
+
+  it("sheet variant reports open state and closes after choosing a question", () => {
+    const onGo = vi.fn();
+    const onOpenChange = vi.fn();
+    render(
+      <QuestionNavigator
+        variant="sheet"
+        quiz={quiz}
+        order={order}
+        answers={{}}
+        flagged={[]}
+        current={0}
+        onGo={onGo}
+        onOpenChange={onOpenChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /1 \/ 4/ }));
+    expect(onOpenChange).toHaveBeenLastCalledWith(true);
+    fireEvent.click(screen.getByRole("button", { name: "Question 3" }));
+    expect(onGo).toHaveBeenCalledWith(2);
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
+    expect(screen.queryByRole("button", { name: "Question 3" })).not.toBeInTheDocument();
+  });
 });

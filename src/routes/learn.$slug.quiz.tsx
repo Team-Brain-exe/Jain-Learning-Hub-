@@ -8,7 +8,7 @@ import { useEnrollments } from "@/hooks/use-enrollment";
 import { btn, btnOutline, card, Empty, fmtDateTime, RequireRole } from "@/components/studio/ui";
 import { ExamEntryCard } from "@/components/proctor/ExamEntryCard";
 import type { Quiz, QuizAttempt } from "@/data/platform";
-import { effectiveMinutes, finalizeExpired, getActiveSession } from "@/data/proctoring";
+import { effectiveMinutes, examSessions, finalizeExpired, sessionKey } from "@/data/proctoring";
 
 export const Route = createFileRoute("/learn/$slug/quiz")({
   head: () => ({ meta: [{ title: "Course assessment — JAIN FET Learning Hub" }, { name: "robots", content: "noindex" }] }),
@@ -119,7 +119,9 @@ function ProctoredQuiz({
   }, [user, slug, quiz]);
 
   const minutes = quiz.proctor ? effectiveMinutes(quiz.proctor, user?.timeMultiplier ?? 1) : 0;
-  const active = !!user && !!getActiveSession(slug, user.id);
+  // Subscribed, so the label flips to "Resume exam" while the exam tab runs (server snapshot: {}).
+  const sessions = examSessions.use();
+  const active = !!user && !!sessions[sessionKey(slug, user.id)];
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">

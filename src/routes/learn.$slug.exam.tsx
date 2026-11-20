@@ -98,6 +98,11 @@ function ExamShell({
   const current = session?.current ?? 0;
   const total = session?.order.length ?? 0;
   const isLast = current >= total - 1;
+  const showQuestions = exam.phase === "active" && !blocked;
+
+  // The sheet unmounts without closing when the questions are hidden; don't leave shortcuts off.
+  const [sheetOpen, setSheetOpen] = useState(false);
+  if (sheetOpen && !showQuestions) setSheetOpen(false);
 
   const prev = () => {
     if (current > 0) exam.go(current - 1);
@@ -113,7 +118,8 @@ function ExamShell({
       !exam.warning &&
       !exam.needsFullscreen &&
       !exam.otherTabActive &&
-      !submitOpen,
+      !submitOpen &&
+      !sheetOpen,
     optionCount: optionOrder.length,
     onPick: (display) => {
       if (!question || !session) return;
@@ -191,19 +197,22 @@ function ExamShell({
         </>
       )}
 
+      {(exam.phase === "active" || exam.phase === "reviewing") && session && (
+        <ExamTopBar
+          title={courseTitle}
+          section={exam.phase === "active" ? question?.section : undefined}
+          saveState={exam.saveState === "failed" ? "error" : exam.saveState}
+          counted={exam.counted}
+          max={cfg.maxViolations}
+          secondsLeft={exam.secondsLeft}
+          answeredPct={answeredPct}
+          onSubmit={exam.phase === "reviewing" ? () => setSubmitOpen(true) : exam.openReview}
+        />
+      )}
+
       {exam.phase === "active" && session && (
         <>
-          <ExamTopBar
-            title={courseTitle}
-            section={question?.section}
-            saveState={exam.saveState === "failed" ? "error" : exam.saveState}
-            counted={exam.counted}
-            max={cfg.maxViolations}
-            secondsLeft={exam.secondsLeft}
-            answeredPct={answeredPct}
-            onSubmit={exam.openReview}
-          />
-          {!blocked && question && (
+          {showQuestions && question && (
             <>
               <div className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-6 pb-24 lg:grid-cols-[1fr_300px] lg:pb-6">
                 <div className="min-w-0 space-y-4">
@@ -274,6 +283,7 @@ function ExamShell({
                   onGo={exam.go}
                   variant="sheet"
                   onReview={exam.openReview}
+                  onOpenChange={setSheetOpen}
                 />
                 <button type="button" className={cn(btn, "px-4")} onClick={next}>
                   {isLast ? "Review" : "Next"}

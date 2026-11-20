@@ -24,6 +24,8 @@ export interface QuestionNavigatorProps {
   variant?: "sidebar" | "sheet";
   /** Sheet variant only: the "Review & submit" button. */
   onReview?: () => void;
+  /** Sheet variant only: told whenever the sheet opens or closes (the shell pauses shortcuts). */
+  onOpenChange?: (open: boolean) => void;
 }
 
 function Legend() {
@@ -127,7 +129,11 @@ function NavigatorBody({
 }
 
 export function QuestionNavigator(props: QuestionNavigatorProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(false);
+  const setOpen = (next: boolean) => {
+    setOpenState(next);
+    props.onOpenChange?.(next);
+  };
   if (props.variant !== "sheet") return <NavigatorBody {...props} cellHeight="h-9" />;
 
   const total = orderedEntries(props.quiz, props.order).length;
