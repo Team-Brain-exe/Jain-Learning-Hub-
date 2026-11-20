@@ -1,8 +1,28 @@
+import * as React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { SecondTabBlocker } from "@/components/proctor/SecondTabBlocker";
 import { ViolationWarning } from "@/components/proctor/ViolationWarning";
+
+// Radix preventDefaults an Escape keydown itself when it dismisses, so the DOM event cannot tell
+// whether our `onEscapeKeyDown` is wired. Capture the prop the component passes instead.
+const captured = vi.hoisted(() => ({ escape: undefined as undefined | ((e: Event) => void) }));
+vi.mock("@/components/ui/alert-dialog", async (orig) => {
+  const actual = await orig<typeof import("@/components/ui/alert-dialog")>();
+  const Content = React.forwardRef<HTMLDivElement, Record<string, unknown>>((props, ref) => {
+    captured.escape = props.onEscapeKeyDown as typeof captured.escape;
+    return <actual.AlertDialogContent ref={ref} {...props} />;
+  });
+  Content.displayName = "CapturingContent";
+  return { ...actual, AlertDialogContent: Content };
+});
+
+const escapeIsBlocked = () => {
+  const e = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+  captured.escape?.(e);
+  return e.defaultPrevented;
+};
 
 const w = (last: boolean) => ({
   n: 2,
@@ -34,6 +54,7 @@ describe("ViolationWarning", () => {
 
   it("stays open on Escape", () => {
     render(<ViolationWarning warning={w(false)} onAcknowledge={() => {}} />);
+    expect(escapeIsBlocked()).toBe(true);
     fireEvent.keyDown(screen.getByRole("alertdialog"), { key: "Escape" });
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
   });
@@ -51,7 +72,14 @@ describe("ViolationWarning", () => {
 describe("SecondTabBlocker", () => {
   it("renders nothing when closed", () => {
     render(<SecondTabBlocker open={false} onTakeOver={() => {}} />);
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("prevents Escape from dismissing", () => {
+    render(<SecondTabBlocker open onTakeOver={() => {}} />);
+    expect(escapeIsBlocked()).toBe(true);
+    fireEvent.keyDown(screen.getByRole("alertdialog"), { key: "Escape" });
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
   });
 
   it("focuses Use this tab and calls onTakeOver", () => {

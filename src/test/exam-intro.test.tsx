@@ -23,6 +23,7 @@ const setup = (attemptsLeft = 2) => {
       attemptsLeft={attemptsLeft}
       maxAttempts={2}
       minutes={30}
+      maxViolations={3}
       onStart={onStart}
     />,
   );
@@ -37,6 +38,25 @@ describe("ExamIntro", () => {
     expect(screen.getByText(/Basics/)).toBeInTheDocument();
     expect(screen.getByText("30 min")).toBeInTheDocument();
     expect(screen.getByText("2 of 2")).toBeInTheDocument();
+  });
+
+  it("states the five rules with the time limit and violation limit", () => {
+    setup();
+    expect(
+      screen.getByText(
+        "You have 30 minutes. The timer keeps running if you refresh or close the tab.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("The exam must stay in fullscreen.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Leaving this tab, copying or right-clicking is recorded."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("After 3 violations your attempt is submitted automatically."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("No webcam, microphone or screen recording is used."),
+    ).toBeInTheDocument();
   });
 
   it("disables Start until the rules are acknowledged, then calls onStart", () => {
