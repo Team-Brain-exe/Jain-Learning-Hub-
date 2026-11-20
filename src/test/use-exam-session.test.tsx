@@ -387,4 +387,98 @@ describe("useExamSession", () => {
     );
     expect(entries).toHaveLength(1);
   });
+
+  describe("fullscreen refused by the browser (warn-only fallback)", () => {
+    const refuse = () => {
+      root.requestFullscreen = vi.fn().mockRejectedValue(new TypeError("denied"));
+    };
+    const unsupported = (r: ReturnType<typeof render>["result"]) =>
+      r.current.session?.violations.filter((v) => v.type === "fullscreen_unsupported") ?? [];
+
+    it("(a) rejection on start stays active, no overlay, one uncounted entry", async () => {
+      refuse();
+      const { result } = render();
+      await act(async () => {
+        await result.current.start();
+      });
+      expect(result.current.phase).toBe("active");
+      expect(result.current.needsFullscreen).toBe(false);
+      expect(unsupported(result)).toEqual([expect.objectContaining({ counted: false })]);
+      expect(result.current.counted).toBe(0);
+    });
+
+    it("(b) a later fullscreenchange exit adds no counted violation", async () => {
+      refuse();
+      const { result } = render();
+      await act(async () => {
+        await result.current.start();
+      });
+      act(() => {
+        setFullscreenElement(document.documentElement);
+        document.dispatchEvent(new Event("fullscreenchange"));
+      });
+      act(() => {
+        setFullscreenElement(null);
+        document.dispatchEvent(new Event("fullscreenchange"));
+      });
+      expect(result.current.counted).toBe(0);
+      expect(result.current.warning).toBeNull();
+      expect(result.current.needsFullscreen).toBe(false);
+    });
+
+    it("(c) a reload (fresh hook) stays warn-only", async () => {
+      refuse();
+      const first = render();
+      await act(async () => {
+        await first.result.current.start();
+      });
+      first.unmount();
+      const { result } = render();
+      expect(result.current.phase).toBe("active");
+      expect(result.current.needsFullscreen).toBe(false);
+      act(() => {
+        setFullscreenElement(null);
+        document.dispatchEvent(new Event("fullscreenchange"));
+      });
+      expect(result.current.counted).toBe(0);
+      expect(unsupported(result)).toHaveLength(1);
+    });
+
+    it("enterFullscreen() rejecting also degrades, logging once", async () => {
+      const { result } = render();
+      await act(async () => {
+        await result.current.start();
+        setFullscreenElement(document.documentElement);
+        document.dispatchEvent(new Event("fullscreenchange"));
+      });
+      refuse();
+      act(() => {
+        setFullscreenElement(null);
+        document.dispatchEvent(new Event("fullscreenchange"));
+      });
+      expect(result.current.needsFullscreen).toBe(true);
+      await act(async () => {
+        await result.current.enterFullscreen();
+        await result.current.enterFullscreen();
+      });
+      expect(result.current.needsFullscreen).toBe(false);
+      expect(unsupported(result)).toHaveLength(1);
+    });
+
+    it("(d) happy path is unchanged: no warn-only entry, exits still count", async () => {
+      const { result } = render();
+      await act(async () => {
+        await result.current.start();
+        setFullscreenElement(document.documentElement);
+        document.dispatchEvent(new Event("fullscreenchange"));
+      });
+      expect(unsupported(result)).toHaveLength(0);
+      act(() => {
+        setFullscreenElement(null);
+        document.dispatchEvent(new Event("fullscreenchange"));
+      });
+      expect(result.current.counted).toBe(1);
+      expect(result.current.needsFullscreen).toBe(true);
+    });
+  });
 });

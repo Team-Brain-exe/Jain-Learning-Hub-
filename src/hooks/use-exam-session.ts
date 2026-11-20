@@ -155,6 +155,9 @@ export function useExamSession({
   }, [key, settle]);
 
   const live = !!session && !result;
+  // Warn-only: fullscreen is unavailable or the browser refused it. Derived from the logged
+  // violation so it survives reloads without a new storage field.
+  const warnOnly = !!session?.violations.some((v) => v.type === "fullscreen_unsupported");
   const owner = live && session.tabId === tabId;
   const otherTabActive = live && otherTabLive(session, tabId, clock);
   const ownerRef = useRef(owner);
@@ -219,7 +222,7 @@ export function useExamSession({
 
   useViolationDetection({
     active: owner && !otherTabActive,
-    watchFullscreen: requireFullscreen && fs.supported,
+    watchFullscreen: requireFullscreen && fs.supported && !warnOnly,
     onViolation,
   });
 
@@ -227,6 +230,19 @@ export function useExamSession({
   useEffect(() => {
     if (fs.isFullscreen) setFsLost(false);
   }, [fs.isFullscreen]);
+
+  /** Fullscreen was refused: never block the student; log once (uncounted) and stop guarding. */
+  const degradeToWarnOnly = useCallback(() => {
+    const cur = examSessions.get()[key];
+    if (cur && !cur.violations.some((v) => v.type === "fullscreen_unsupported")) {
+      recordViolation(key, {
+        type: "fullscreen_unsupported",
+        at: new Date().toISOString(),
+        counted: false,
+      });
+    }
+    setFsLost(false);
+  }, [key]);
 
   const start = useCallback(async (): Promise<void> => {
     // Must run before any await: browsers only grant fullscreen inside the click's gesture.
@@ -257,8 +273,8 @@ export function useExamSession({
       });
     }
     setClock(Date.now());
-    if (entering && !(await entering) && fs.supported) setFsLost(true);
-  }, [requireFullscreen, fs, key, tabId]);
+    if (entering && !(await entering) && fs.supported) degradeToWarnOnly();
+  }, [requireFullscreen, fs, key, tabId, degradeToWarnOnly]);
 
   const answer = useCallback(
     (qid: string, a: number | number[] | undefined) => {
@@ -270,7 +286,8 @@ export function useExamSession({
 
   const enterFullscreen = useCallback(async (): Promise<void> => {
     if (await fs.enter()) setFsLost(false);
-  }, [fs]);
+    else if (fs.supported) degradeToWarnOnly();
+  }, [fs, degradeToWarnOnly]);
 
   const takeOver = useCallback(() => {
     if (!examSessions.get()[key]) return;
@@ -293,7 +310,7 @@ export function useExamSession({
     secondsLeft,
     counted: session ? session.violations.filter((v) => v.counted).length : 0,
     warning,
-    needsFullscreen: live && fsLost && requireFullscreen && fs.supported,
+    needsFullscreen: live && fsLost && requireFullscreen && fs.supported && !warnOnly,
     otherTabActive,
     saveState,
     result,
