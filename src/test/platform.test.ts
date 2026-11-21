@@ -96,3 +96,32 @@ describe("assessments and certificates", () => {
     expect(platform.get().certificates[0]!.status).toBe("issued");
   });
 });
+
+describe("attempt meta and legacy scoring", () => {
+  const quiz = {
+    passMark: 50,
+    maxAttempts: 3,
+    questions: [{ id: "q1", prompt: "p", options: ["a", "b"], correct: 1, explanation: "e" }],
+  };
+
+  it("stores meta unchanged and leaves it undefined when omitted", () => {
+    const learner = user("u-learner");
+    const meta = {
+      violations: [],
+      timeTakenSec: 42,
+      autoSubmitted: true,
+      autoSubmitReason: "timeout" as const,
+    };
+    const a = submitAttempt(learner, "data-structures-and-algorithms", { ds1: 1 }, meta);
+    expect(typeof a).not.toBe("string");
+    if (typeof a !== "string") expect(a.meta).toEqual(meta);
+    const b = submitAttempt(learner, "data-structures-and-algorithms", { ds1: 1 });
+    if (typeof b !== "string") expect(b.meta).toBeUndefined();
+  });
+
+  it("scores an untyped question exactly as before", () => {
+    expect(scoreQuiz(quiz, { q1: 1 })).toEqual({ right: 1, total: 1, score: 100, passed: true });
+    expect(scoreQuiz(quiz, { q1: 0 })).toEqual({ right: 0, total: 1, score: 0, passed: false });
+    expect(scoreQuiz(quiz, {})).toEqual({ right: 0, total: 1, score: 0, passed: false });
+  });
+});
