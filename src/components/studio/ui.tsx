@@ -64,8 +64,11 @@ function Blocked({ title, body, children }: { title: string; body: string; child
   );
 }
 
-export const fmtDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—");
-export const fmtDateTime = (iso?: string) => (iso ? new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—");
+// Fixed locale and time zone so the server-rendered date matches the browser's (no hydration mismatch).
+const DATE_LOCALE = "en-IN";
+const DATE_TZ = "Asia/Kolkata";
+export const fmtDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(DATE_LOCALE, { day: "numeric", month: "short", year: "numeric", timeZone: DATE_TZ }) : "—");
+export const fmtDateTime = (iso?: string) => (iso ? new Date(iso).toLocaleString(DATE_LOCALE, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: DATE_TZ }) : "—");
 
 export function Empty({ title, body, children }: { title: string; body?: string; children?: ReactNode }) {
   return (
