@@ -117,6 +117,14 @@ def verify_certificate_eligibility(
                 detail=f"Ineligible: Peer educator certificates are restricted to student creators (recipient role is '{recipient_user.role}')."
             )
 
+    # Final safeguard: recipient must be a real student account.
+    recipient_user = db.query(User).filter(User.id == recipient_id).first()
+    if recipient_user is None or recipient_user.role != "student":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ineligible: Recipient must be an existing student account."
+        )
+
     return course
 
 @router.get("/api/certificates/me", response_model=List[CertificateResponse])
