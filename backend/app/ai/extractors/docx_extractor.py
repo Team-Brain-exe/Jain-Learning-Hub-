@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 class DOCXExtractor(BaseExtractor):
     """
     Extracts structured text from Microsoft Word documents (.docx) including headings,
-    paragraphs, and tables.
+    paragraphs, and tables with strict validation for file integrity.
     """
 
     def can_handle(self, file_name: str, mime_type: str) -> bool:
@@ -21,14 +21,15 @@ class DOCXExtractor(BaseExtractor):
         )
 
     def extract(self, file_path: str, asset_id: str, asset_name: str) -> List[ContentSegment]:
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"Document file not found at path: {file_path}")
+        is_valid, err = self.validate_file(file_path)
+        if not is_valid:
+            return [self.make_error_segment(asset_id, asset_name, err or "Invalid document file")]
 
         try:
             import docx
         except ImportError:
             logger.warning("python-docx is not installed.")
-            return []
+            return [self.make_error_segment(asset_id, asset_name, "python-docx library not available")]
 
         segments: List[ContentSegment] = []
         try:
@@ -83,22 +84,13 @@ class DOCXExtractor(BaseExtractor):
                         segment_index=0,
                         location_type=LocationType.SECTION,
                         location_value="Document Content",
-                        text="[Empty document or unsupported XML structure]",
+                        text="[Empty document content]",
                         metadata={"asset_name": asset_name}
                     )
                 )
 
         except Exception as e:
             logger.error(f"Error extracting DOCX {file_path}: {str(e)}", exc_info=True)
-            segments.append(
-                ContentSegment(
-                    asset_id=asset_id,
-                    segment_index=0,
-                    location_type=LocationType.GLOBAL,
-                    location_value="Extraction Error",
-                    text=f"[DOCX Extraction Failure: {str(e)}]",
-                    metadata={"error": str(e), "asset_name": asset_name}
-                )
-            )
+            segments.append(self.make_error_segment(asset_id, asset_name, f"DOCX Extraction Failure: {str(e)}"))
 
         return segments

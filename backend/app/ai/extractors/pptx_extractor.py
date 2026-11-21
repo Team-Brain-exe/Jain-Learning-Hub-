@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 class PPTXExtractor(BaseExtractor):
     """
     Extracts slide text, tables, and speaker notes from PowerPoint presentations (PPTX).
+    Safely validates file existence, size, and handles corrupt or empty presentations.
     """
 
     def can_handle(self, file_name: str, mime_type: str) -> bool:
@@ -21,19 +22,22 @@ class PPTXExtractor(BaseExtractor):
         )
 
     def extract(self, file_path: str, asset_id: str, asset_name: str) -> List[ContentSegment]:
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"Presentation file not found at path: {file_path}")
+        is_valid, err = self.validate_file(file_path)
+        if not is_valid:
+            return [self.make_error_segment(asset_id, asset_name, err or "Invalid presentation file")]
 
         try:
             from pptx import Presentation
         except ImportError:
             logger.warning("python-pptx is not installed.")
-            return []
+            return [self.make_error_segment(asset_id, asset_name, "python-pptx library not available")]
 
         segments: List[ContentSegment] = []
         try:
             prs = Presentation(file_path)
             total_slides = len(prs.slides)
+            if total_slides == 0:
+                return [self.make_error_segment(asset_id, asset_name, "Presentation contains zero slides")]
 
             for slide_idx, slide in enumerate(prs.slides):
                 slide_num = slide_idx + 1
@@ -84,15 +88,6 @@ class PPTXExtractor(BaseExtractor):
 
         except Exception as e:
             logger.error(f"Error extracting PPTX {file_path}: {str(e)}", exc_info=True)
-            segments.append(
-                ContentSegment(
-                    asset_id=asset_id,
-                    segment_index=0,
-                    location_type=LocationType.GLOBAL,
-                    location_value="Extraction Error",
-                    text=f"[PPTX Extraction Failure: {str(e)}]",
-                    metadata={"error": str(e), "asset_name": asset_name}
-                )
-            )
+            segments.append(self.make_error_segment(asset_id, asset_name, f"PPTX Extraction Failure: {str(e)}"))
 
         return segments
