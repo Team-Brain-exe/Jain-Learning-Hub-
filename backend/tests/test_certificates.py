@@ -173,3 +173,128 @@ def test_peer_educator_success_and_admin_role_restriction(client, auth_headers):
     assert cert_data["certificate_type"] == "PEER_EDUCATOR"
     assert "Peer Educator" in cert_data["title"]
 
+def test_course_completion_ineligible_for_unpublished_course(client, auth_headers):
+    # Enroll student in draft course (if forced or historical)
+    req_payload = {
+        "recipient_id": "student_learner",
+        "course_id": "course_draft_only",
+        "certificate_type": "COURSE_COMPLETION",
+        "is_sample": True
+    }
+    res = client.post("/api/admin/certificates/issue", json=req_payload, headers=auth_headers["admin_user"])
+    assert res.status_code == 400
+    assert "must be approved and published" in res.json()["detail"]
+
+def test_certificate_duplicate_handling_idempotent(client, auth_headers):
+    # 1. Complete requirements for student_learner
+    client.post("/api/courses/course_dist_sys/enroll", headers=auth_headers["student_learner"])
+    client.post("/api/lessons/les_ds_01/progress", json={"is_completed": True}, headers=auth_headers["student_learner"])
+    client.post("/api/quizzes/quiz_ds_01/attempts", json={"answers": [{"question_id": "q_ds_01", "selected_option_index": 0}]}, headers=auth_headers["student_learner"])
+
+    req_payload = {
+        "recipient_id": "student_learner",
+        "course_id": "course_dist_sys",
+        "certificate_type": "COURSE_COMPLETION",
+        "is_sample": True
+    }
+
+    # First issuance -> 201 Created
+    res1 = client.post("/api/admin/certificates/issue", json=req_payload, headers=auth_headers["admin_user"])
+    assert res1.status_code == 201
+    code1 = res1.json()["certificate_code"]
+    cert_id = res1.json()["id"]
+
+    # Second issuance with identical payload -> 200 OK (idempotent duplicate handling)
+    res2 = client.post("/api/admin/certificates/issue", json=req_payload, headers=auth_headers["admin_user"])
+    assert res2.status_code == 200
+    assert res2.json()["certificate_code"] == code1
+    assert res2.json()["id"] == cert_id
+
+def test_peer_educator_role_restriction(client, auth_headers, db_session):
+    # Create a published course owned by a faculty member
+    fac_course = Course(
+        id="course_fac_owned",
+        creator_id="fac_1",
+        permission_id="perm_cert_01",
+        title="Faculty Advanced Seminar",
+        slug="faculty-advanced-seminar",
+        category="academic",
+        level="advanced",
+        status=CourseLifecycleStatus.PUBLISHED,
+        faculty_reviewer_id="fac_1"
+    )
+    db_session.add(fac_course)
+    db_session.commit()
+
+    # Attempt to issue Peer Educator certificate to a faculty member -> 400
+    req_payload = {
+        "recipient_id": "fac_1",
+        "course_id": "course_fac_owned",
+        "certificate_type": "PEER_EDUCATOR",
+        "is_sample": True
+    }
+    res = client.post("/api/admin/certificates/issue", json=req_payload, headers=auth_headers["admin_user"])
+    assert res.status_code == 400
+    assert "restricted to student creators" in res.json()["detail"]
+
+def test_certificate_recipient_name_lookup(client, auth_headers):
+    # Complete requirements for student_learner
+    client.post("/api/courses/course_dist_sys/enroll", headers=auth_headers["student_learner"])
+    client.post("/api/lessons/les_ds_01/progress", json={"is_completed": True}, headers=auth_headers["student_learner"])
+    client.post("/api/quizzes/quiz_ds_01/attempts", json={"answers": [{"question_id": "q_ds_01", "selected_option_index": 0}]}, headers=auth_headers["student_learner"])
+
+    req_payload = {
+        "recipient_id": "student_learner",
+        "course_id": "course_dist_sys",
+        "certificate_type": "COURSE_COMPLETION",
+        "is_sample": False
+    }
+    res = client.post("/api/admin/certificates/issue", json=req_payload, headers=auth_headers["admin_user"])
+    assert res.status_code in [200, 201]
+    # Verify recipient_name is resolved from the User table ("Test student_learner")
+    assert res.json()["recipient_name"] == "Test student_learner"
+
+def test_check_certificate_eligibility_endpoint(client, auth_headers):
+    # Initial state: student not enrolled
+    el_0 = client.get("/api/courses/course_dist_sys/certificate-eligibility", headers=auth_headers["student_learner"]).json()
+    assert el_0["is_enrolled"] is False
+    assert el_0["is_eligible_for_completion_cert"] is False
+
+    # Enroll
+    client.post("/api/courses/course_dist_sys/enroll", headers=auth_headers["student_learner"])
+    el_1 = client.get("/api/courses/course_dist_sys/certificate-eligibility", headers=auth_headers["student_learner"]).json()
+    assert el_1["is_enrolled"] is True
+    assert el_1["lessons_completed"] is False
+    assert el_1["is_eligible_for_completion_cert"] is False
+
+    # Complete lesson & quiz
+    client.post("/api/lessons/les_ds_01/progress", json={"is_completed": True}, headers=auth_headers["student_learner"])
+    client.post("/api/quizzes/quiz_ds_01/attempts", json={"answers": [{"question_id": "q_ds_01", "selected_option_index": 0}]}, headers=auth_headers["student_learner"])
+
+    el_2 = client.get("/api/courses/course_dist_sys/certificate-eligibility", headers=auth_headers["student_learner"]).json()
+    assert el_2["lessons_completed"] is True
+    assert el_2["quiz_passed"] is True
+    assert el_2["is_eligible_for_completion_cert"] is True
+
+    # Creator check for peer educator
+    el_creator = client.get("/api/courses/course_dist_sys/certificate-eligibility", headers=auth_headers["creator_student"]).json()
+    assert el_creator["is_eligible_for_peer_educator_cert"] is True
+
+    # After issuing, existing certificate code is returned in eligibility response
+    client.post("/api/admin/certificates/issue", json={
+        "recipient_id": "student_learner",
+        "course_id": "course_dist_sys",
+        "certificate_type": "COURSE_COMPLETION",
+        "is_sample": True
+    }, headers=auth_headers["admin_user"])
+
+    el_3 = client.get("/api/courses/course_dist_sys/certificate-eligibility", headers=auth_headers["student_learner"]).json()
+    assert el_3["existing_completion_certificate_code"] is not None
+    assert "JAIN-COUR-" in el_3["existing_completion_certificate_code"]
+
+def test_public_verification_invalid_code(client):
+    res = client.get("/api/certificates/verify/NON-EXISTENT-CODE")
+    assert res.status_code == 404
+    assert "Invalid certificate" in res.json()["detail"]
+
+

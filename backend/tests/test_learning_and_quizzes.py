@@ -165,3 +165,152 @@ def test_quiz_attempt_anti_forgery_and_passing_threshold(client, auth_headers):
     assert pass_data["score_percentage"] == 100.0
     assert pass_data["passed"] is True
 
+def test_get_my_enrollments_and_course_enrollment(client, auth_headers):
+    # Before enrollment: /api/courses/{id}/enrollment returns 404
+    chk_before = client.get("/api/courses/course_pub_01/enrollment", headers=auth_headers["learner_101"])
+    assert chk_before.status_code == 404
+
+    # Enroll learner
+    client.post("/api/courses/course_pub_01/enroll", headers=auth_headers["learner_101"])
+
+    # Check /api/enrollments/me
+    me_res = client.get("/api/enrollments/me", headers=auth_headers["learner_101"])
+    assert me_res.status_code == 200
+    items = me_res.json()
+    assert len(items) >= 1
+    assert items[0]["course_id"] == "course_pub_01"
+    assert items[0]["student_id"] == "learner_101"
+
+    # Check /api/courses/{id}/enrollment returns 200
+    chk_after = client.get("/api/courses/course_pub_01/enrollment", headers=auth_headers["learner_101"])
+    assert chk_after.status_code == 200
+    assert chk_after.json()["course_id"] == "course_pub_01"
+
+def test_non_student_role_cannot_enroll(client, auth_headers):
+    # Faculty attempting enrollment -> 403 Forbidden
+    res = client.post("/api/courses/course_pub_01/enroll", headers=auth_headers["fac_1"])
+    assert res.status_code == 403
+
+def test_get_course_progress_requires_enrollment(client, auth_headers):
+    # Unenrolled student attempting to view progress -> 403 Forbidden
+    res = client.get("/api/courses/course_pub_01/progress", headers=auth_headers["unregistered_student"])
+    assert res.status_code == 403
+    assert "must be enrolled" in res.json()["detail"]
+
+def test_order_independent_course_completion_sync(client, auth_headers):
+    """
+    Verifies that enrollment.completed_at is accurately updated when:
+    1. Student passes quiz FIRST
+    2. Student completes lessons AFTERWARDS
+    3. Student uncompletes a lesson -> completed_at is reset
+    """
+    # 1. Enroll learner
+    client.post("/api/courses/course_pub_01/enroll", headers=auth_headers["learner_101"])
+
+    # 2. Pass quiz FIRST
+    pass_res = client.post(
+        "/api/quizzes/quiz_01/attempts",
+        json={"answers": [
+            {"question_id": "q_01", "selected_option_index": 1},
+            {"question_id": "q_02", "selected_option_index": 0}
+        ]},
+        headers=auth_headers["learner_101"]
+    )
+    assert pass_res.status_code == 200
+
+    # Lessons not done yet -> enrollment.completed_at should be None
+    enr_res = client.get("/api/courses/course_pub_01/enrollment", headers=auth_headers["learner_101"])
+    assert enr_res.json()["completed_at"] is None
+
+    # 3. Complete lesson 1
+    client.post("/api/lessons/les_01/progress", json={"is_completed": True}, headers=auth_headers["learner_101"])
+    enr_res = client.get("/api/courses/course_pub_01/enrollment", headers=auth_headers["learner_101"])
+    assert enr_res.json()["completed_at"] is None
+
+    # 4. Complete lesson 2 -> All lessons + quiz passed -> enrollment.completed_at is SET
+    client.post("/api/lessons/les_02/progress", json={"is_completed": True}, headers=auth_headers["learner_101"])
+    enr_res = client.get("/api/courses/course_pub_01/enrollment", headers=auth_headers["learner_101"])
+    assert enr_res.json()["completed_at"] is not None
+
+    # Check progress overview includes completed lesson IDs and quiz status
+    prog = client.get("/api/courses/course_pub_01/progress", headers=auth_headers["learner_101"]).json()
+    assert prog["is_course_completed"] is True
+    assert prog["is_quiz_passed"] is True
+    assert set(prog["completed_lesson_ids"]) == {"les_01", "les_02"}
+
+    # 5. Unmark lesson 2 -> completed_at is RESET to None
+    client.post("/api/lessons/les_02/progress", json={"is_completed": False}, headers=auth_headers["learner_101"])
+    enr_res = client.get("/api/courses/course_pub_01/enrollment", headers=auth_headers["learner_101"])
+    assert enr_res.json()["completed_at"] is None
+
+def test_quiz_details_and_course_quiz_endpoints(client, auth_headers):
+    # Unenrolled student cannot access quiz
+    res_unauth = client.get("/api/courses/course_pub_01/quiz", headers=auth_headers["unregistered_student"])
+    assert res_unauth.status_code == 403
+
+    # Enroll learner
+    client.post("/api/courses/course_pub_01/enroll", headers=auth_headers["learner_101"])
+
+    # Lookup via /api/courses/{id}/quiz
+    q_course = client.get("/api/courses/course_pub_01/quiz", headers=auth_headers["learner_101"])
+    assert q_course.status_code == 200
+    q_data = q_course.json()
+    assert q_data["id"] == "quiz_01"
+    assert len(q_data["questions"]) == 2
+    # Verify answers are NOT exposed
+    for q in q_data["questions"]:
+        assert "correct_option_index" not in q
+
+    # Lookup via /api/quizzes/{id}
+    q_direct = client.get("/api/quizzes/quiz_01", headers=auth_headers["learner_101"])
+    assert q_direct.status_code == 200
+    assert q_direct.json()["id"] == "quiz_01"
+
+def test_quiz_anti_forgery_duplicate_and_invalid_questions(client, auth_headers):
+    """
+    Prevents forged answer submissions from:
+    1. Repeating the same correct answer multiple times to artificially inflate score
+    2. Submitting bogus question IDs not belonging to the quiz
+    """
+    client.post("/api/courses/course_pub_01/enroll", headers=auth_headers["learner_101"])
+
+    # Attempt to game the score by sending 4 copies of correct question 1 and bogus question IDs
+    cheat_payload = {
+        "answers": [
+            {"question_id": "q_01", "selected_option_index": 1},  # correct
+            {"question_id": "q_01", "selected_option_index": 1},  # duplicate
+            {"question_id": "q_01", "selected_option_index": 1},  # duplicate
+            {"question_id": "bogus_question_id", "selected_option_index": 0}  # fake question
+        ]
+    }
+    res = client.post("/api/quizzes/quiz_01/attempts", json=cheat_payload, headers=auth_headers["learner_101"])
+    assert res.status_code == 200
+    data = res.json()
+    # Quiz has 2 total questions. Deduplication means q_01 counts once = 1/2 = 50.0% (< 70% threshold)
+    assert data["total_questions"] == 2
+    assert data["correct_answers"] == 1
+    assert data["score_percentage"] == 50.0
+    assert data["passed"] is False
+
+def test_get_quiz_attempts_history(client, auth_headers):
+    client.post("/api/courses/course_pub_01/enroll", headers=auth_headers["learner_101"])
+
+    # Submit 1 failing attempt
+    client.post("/api/quizzes/quiz_01/attempts", json={
+        "answers": [{"question_id": "q_01", "selected_option_index": 0}, {"question_id": "q_02", "selected_option_index": 1}]
+    }, headers=auth_headers["learner_101"])
+
+    # Submit 1 passing attempt
+    client.post("/api/quizzes/quiz_01/attempts", json={
+        "answers": [{"question_id": "q_01", "selected_option_index": 1}, {"question_id": "q_02", "selected_option_index": 0}]
+    }, headers=auth_headers["learner_101"])
+
+    # Query /api/quizzes/{id}/attempts
+    hist_res = client.get("/api/quizzes/quiz_01/attempts", headers=auth_headers["learner_101"])
+    assert hist_res.status_code == 200
+    attempts = hist_res.json()
+    assert len(attempts) >= 2
+    assert attempts[0]["passed"] is True
+    assert attempts[1]["passed"] is False
+
+
