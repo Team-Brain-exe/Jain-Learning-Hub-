@@ -1,6 +1,12 @@
 import { useSyncExternalStore } from "react";
+import {
+  enrollInCourse,
+  recordLessonProgress,
+  fetchMyEnrollments,
+  getStoredToken,
+} from "@/lib/api-client";
 
-// Demo-only learner state kept in this browser; swap for an API service later.
+// Learner state kept in this browser and synchronized with backend API when authenticated.
 const KEY = "jfet-learner-v2";
 const LEGACY = "jfet-enrollments";
 
@@ -30,16 +36,47 @@ function write(next: LearnerState) {
   listeners.forEach((l) => l());
 }
 
-export const enroll = (slug: string) => {
+export const enroll = (slug: string, courseId?: string) => {
   const s = read();
   write({ ...s, enrolled: Array.from(new Set([...s.enrolled, slug])), accessed: { ...s.accessed, [slug]: s.accessed[slug] ?? Date.now() } });
+
+  const token = getStoredToken();
+  if (token) {
+    enrollInCourse(courseId ?? slug).catch(() => {
+      // Local state remains active
+    });
+  }
 };
+
 export const setLessonComplete = (slug: string, lessonId: string, done: boolean) => {
   const s = read();
   const cur = new Set(s.completed[slug] ?? []);
   if (done) cur.add(lessonId); else cur.delete(lessonId);
   write({ ...s, completed: { ...s.completed, [slug]: [...cur] } });
+
+  const token = getStoredToken();
+  if (token) {
+    recordLessonProgress(lessonId, done).catch(() => {
+      // Local state remains active
+    });
+  }
 };
+
+export const syncEnrollmentsFromApi = async () => {
+  const token = getStoredToken();
+  if (!token) return;
+  try {
+    const enrollments = await fetchMyEnrollments();
+    if (enrollments && enrollments.length) {
+      const s = read();
+      const courseIds = enrollments.map((e) => e.course_id);
+      write({ ...s, enrolled: Array.from(new Set([...s.enrolled, ...courseIds])) });
+    }
+  } catch {
+    // Ignore network or auth errors
+  }
+};
+
 export const visitLesson = (slug: string, lessonId: string) => {
   const s = read();
   write({
