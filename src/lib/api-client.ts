@@ -2,6 +2,28 @@ const API_BASE_URL = (
   import.meta.env["VITE_API_URL"] || "http://localhost:8000"
 ).replace(/\/+$/, "");
 
+export const TOKEN_STORAGE_KEY = "jfet-auth-token";
+
+export function getStoredToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredToken(token: string | null): void {
+  try {
+    if (token) {
+      localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    } else {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
+  } catch {
+    // ignore storage errors
+  }
+}
+
 export interface LoginResponse {
   access_token: string;
   token_type: string;
@@ -38,8 +60,9 @@ export async function apiRequest<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
+  const effectiveToken = token !== undefined ? token : getStoredToken();
+  if (effectiveToken) {
+    headers.set("Authorization", `Bearer ${effectiveToken}`);
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -61,6 +84,10 @@ export async function apiRequest<T>(
       // Use the default error message.
     }
 
+    if (response.status === 401 && effectiveToken) {
+      setStoredToken(null);
+    }
+
     throw new ApiError(response.status, message);
   }
 
@@ -78,10 +105,14 @@ export function loginWithPassword(email: string, password: string) {
   });
 }
 
-export function fetchCurrentUser(token: string) {
+export function fetchCurrentUser(token?: string) {
   return apiRequest<CurrentUserResponse>(
     "/api/auth/me",
     { method: "GET" },
     token,
   );
+}
+
+export function logoutUser() {
+  setStoredToken(null);
 }
