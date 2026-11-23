@@ -9,6 +9,7 @@ import { btn, btnOutline, card, Empty, fmtDateTime, RequireRole } from "@/compon
 import { ExamEntryCard } from "@/components/proctor/ExamEntryCard";
 import type { Quiz, QuizAttempt } from "@/data/platform";
 import { effectiveMinutes, examSessions, finalizeExpired, sessionKey } from "@/data/proctoring";
+import { getStoredToken, submitQuizAttempt } from "@/lib/api-client";
 
 export const Route = createFileRoute("/learn/$slug/quiz")({
   head: () => ({ meta: [{ title: "Course assessment — JAIN FET Learning Hub" }, { name: "robots", content: "noindex" }] }),
@@ -37,6 +38,12 @@ function QuizPage() {
   const complete = quiz.questions.every((q) => answers[q.id] !== undefined);
 
   const submit = () => {
+    const token = getStoredToken();
+    if (token) {
+      submitQuizAttempt(slug, answers).catch(() => {
+        // Fall back gracefully to local evaluation
+      });
+    }
     const a = submitAttempt(user!, slug, answers);
     if (typeof a === "string") { toast.error(a); return; }
     setResult(scoreQuiz(quiz, answers));

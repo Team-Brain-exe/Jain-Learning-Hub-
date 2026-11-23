@@ -40,6 +40,12 @@ __pycache__/
 .pytest_cache/
 *.db
 
+# Local environment variables
+.env
+.env.*
+!.env.example
+
+
 # Subagent-driven-development working files
 .superpowers/
 

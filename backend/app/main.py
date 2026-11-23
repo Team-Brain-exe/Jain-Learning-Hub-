@@ -63,7 +63,65 @@ def seed_initial_faculty():
         db.close()
 
 
+def seed_initial_users():
+    db = SessionLocal()
+
+    try:
+        from app.core.security import hash_password
+
+        if not db.query(User).first():
+            users = [
+                User(
+                    id="student_101",
+                    name="Aarav Sharma",
+                    email="student101@example.com",
+                    password_hash=hash_password("TestPassword123!"),
+                    role="student",
+                    is_active=True,
+                ),
+                User(
+                    id="student_creator",
+                    name="Ananya Rao",
+                    email="creator@demo.jain.edu",
+                    password_hash=hash_password("TestPassword123!"),
+                    role="student",
+                    is_active=True,
+                ),
+                User(
+                    id="fac_cs_01",
+                    name="Dr. Ramesh Rao",
+                    email="ramesh.rao@jainuniversity.ac.in",
+                    password_hash=hash_password("TestPassword123!"),
+                    role="faculty",
+                    is_active=True,
+                ),
+                User(
+                    id="fac_ai_02",
+                    name="Prof. Sunita Sharma",
+                    email="sunita.sharma@jainuniversity.ac.in",
+                    password_hash=hash_password("TestPassword123!"),
+                    role="faculty",
+                    is_active=True,
+                ),
+                User(
+                    id="admin_user",
+                    name="University Admin",
+                    email="admin@demo.jain.edu",
+                    password_hash=hash_password("TestPassword123!"),
+                    role="admin",
+                    is_active=True,
+                ),
+            ]
+            db.add_all(users)
+            db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+
+
 seed_initial_faculty()
+seed_initial_users()
 
 
 # Initialize FastAPI
