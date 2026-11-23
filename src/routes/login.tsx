@@ -133,6 +133,13 @@ function Login() {
           </button>
         </form>
 
+        <p className="mt-5 text-center text-sm text-muted-foreground">
+          New to JAIN Learning Hub?{" "}
+          <Link to="/register" className="font-semibold text-primary hover:underline">
+            Create Account
+          </Link>
+        </p>
+
         <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
           <span className="h-px flex-1 bg-border" />
           or
