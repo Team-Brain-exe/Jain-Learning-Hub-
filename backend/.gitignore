@@ -1,1 +1,10 @@
 .env
+
+# Local databases, backups and utility output (never commit data)
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+*.partial
+dev_data/
