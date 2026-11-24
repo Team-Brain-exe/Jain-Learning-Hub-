@@ -24,17 +24,20 @@ class EmailNotificationService:
         content_type: str,
         description: str,
     ) -> Dict[str, Any]:
-        frontend_url = os.getenv("FRONTEND_BASE_URL", "").rstrip("/")
+        raw_frontend_url = os.getenv("FRONTEND_BASE_URL")
+        frontend_url = (
+            raw_frontend_url if raw_frontend_url is not None else "http://localhost:5173"
+        ).strip().rstrip("/")
         review_url = (
-            f"{frontend_url}/faculty/review-request/"
+            f"{frontend_url}/faculty/consent/"
             f"{quote(str(request_id), safe='')}"
         )
 
-        smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+        smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com").strip()
         smtp_port = int(os.getenv("SMTP_PORT", "587"))
-        smtp_username = os.getenv("SMTP_USERNAME", "")
-        smtp_password = os.getenv("SMTP_PASSWORD", "")
-        from_email = os.getenv("SMTP_FROM_EMAIL", "")
+        smtp_username = os.getenv("SMTP_USERNAME", "").strip()
+        smtp_password = os.getenv("SMTP_PASSWORD", "").strip()
+        from_email = os.getenv("SMTP_FROM_EMAIL", "").strip()
 
         if not all([
             frontend_url,
@@ -85,7 +88,7 @@ class EmailNotificationService:
                 "review_url": review_url,
             }
 
-        except (smtplib.SMTPException, OSError) as exc:
+        except Exception as exc:
             logger.error(
                 "Faculty email delivery failed for request_id=%s: %s",
                 request_id,

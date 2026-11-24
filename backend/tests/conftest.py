@@ -206,7 +206,7 @@ def mock_faculty_email_notifications(monkeypatch, request):
             "status": "SENT",
             "recipient": faculty_email,
             "review_url": (
-                "http://localhost:5173/faculty/review-request/"
+                "http://localhost:5173/faculty/consent/"
                 f"{request_id}"
             ),
         }
