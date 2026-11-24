@@ -24,10 +24,8 @@ import { Route as CoursesSlugRouteImport } from './routes/courses.$slug'
 import { Route as CreatorIndexRouteImport } from './routes/creator.index'
 import { Route as CreatorIdRouteImport } from './routes/creator.$id'
 import { Route as FacultyIndexRouteImport } from './routes/faculty.index'
-import { Route as FacultyConsentsRouteImport } from './routes/faculty.consents'
 import { Route as VerifyIndexRouteImport } from './routes/verify.index'
 import { Route as VerifyCertificateIdRouteImport } from './routes/verify.$certificateId'
-import { Route as FacultyConsentIdRouteImport } from './routes/faculty.consent.$id'
 import { Route as FacultyReviewIdRouteImport } from './routes/faculty.review.$id'
 import { Route as LearnSlugLessonIdRouteImport } from './routes/learn.$slug.$lessonId'
 import { Route as LearnSlugExamRouteImport } from './routes/learn.$slug.exam'
@@ -108,11 +106,6 @@ const FacultyIndexRoute = FacultyIndexRouteImport.update({
   path: '/faculty/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const FacultyConsentsRoute = FacultyConsentsRouteImport.update({
-  id: '/faculty/consents',
-  path: '/faculty/consents',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const VerifyIndexRoute = VerifyIndexRouteImport.update({
   id: '/verify/',
   path: '/verify/',
@@ -121,11 +114,6 @@ const VerifyIndexRoute = VerifyIndexRouteImport.update({
 const VerifyCertificateIdRoute = VerifyCertificateIdRouteImport.update({
   id: '/verify/$certificateId',
   path: '/verify/$certificateId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FacultyConsentIdRoute = FacultyConsentIdRouteImport.update({
-  id: '/faculty/consent/$id',
-  path: '/faculty/consent/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FacultyReviewIdRoute = FacultyReviewIdRouteImport.update({
@@ -161,14 +149,12 @@ export interface FileRoutesByFullPath {
   '/certificates/$certId': typeof CertificatesCertIdRoute
   '/courses/$slug': typeof CoursesSlugRoute
   '/creator/$id': typeof CreatorIdRoute
-  '/faculty/consents': typeof FacultyConsentsRoute
   '/verify/$certificateId': typeof VerifyCertificateIdRoute
   '/certificates/': typeof CertificatesIndexRoute
   '/courses/': typeof CoursesIndexRoute
   '/creator/': typeof CreatorIndexRoute
   '/faculty/': typeof FacultyIndexRoute
   '/verify/': typeof VerifyIndexRoute
-  '/faculty/consent/$id': typeof FacultyConsentIdRoute
   '/faculty/review/$id': typeof FacultyReviewIdRoute
   '/learn/$slug/$lessonId': typeof LearnSlugLessonIdRoute
   '/learn/$slug/exam': typeof LearnSlugExamRoute
@@ -186,14 +172,12 @@ export interface FileRoutesByTo {
   '/certificates/$certId': typeof CertificatesCertIdRoute
   '/courses/$slug': typeof CoursesSlugRoute
   '/creator/$id': typeof CreatorIdRoute
-  '/faculty/consents': typeof FacultyConsentsRoute
   '/verify/$certificateId': typeof VerifyCertificateIdRoute
   '/certificates': typeof CertificatesIndexRoute
   '/courses': typeof CoursesIndexRoute
   '/creator': typeof CreatorIndexRoute
   '/faculty': typeof FacultyIndexRoute
   '/verify': typeof VerifyIndexRoute
-  '/faculty/consent/$id': typeof FacultyConsentIdRoute
   '/faculty/review/$id': typeof FacultyReviewIdRoute
   '/learn/$slug/$lessonId': typeof LearnSlugLessonIdRoute
   '/learn/$slug/exam': typeof LearnSlugExamRoute
@@ -212,14 +196,12 @@ export interface FileRoutesById {
   '/certificates/$certId': typeof CertificatesCertIdRoute
   '/courses/$slug': typeof CoursesSlugRoute
   '/creator/$id': typeof CreatorIdRoute
-  '/faculty/consents': typeof FacultyConsentsRoute
   '/verify/$certificateId': typeof VerifyCertificateIdRoute
   '/certificates/': typeof CertificatesIndexRoute
   '/courses/': typeof CoursesIndexRoute
   '/creator/': typeof CreatorIndexRoute
   '/faculty/': typeof FacultyIndexRoute
   '/verify/': typeof VerifyIndexRoute
-  '/faculty/consent/$id': typeof FacultyConsentIdRoute
   '/faculty/review/$id': typeof FacultyReviewIdRoute
   '/learn/$slug/$lessonId': typeof LearnSlugLessonIdRoute
   '/learn/$slug/exam': typeof LearnSlugExamRoute
@@ -239,14 +221,12 @@ export interface FileRouteTypes {
     | '/certificates/$certId'
     | '/courses/$slug'
     | '/creator/$id'
-    | '/faculty/consents'
     | '/verify/$certificateId'
     | '/certificates/'
     | '/courses/'
     | '/creator/'
     | '/faculty/'
     | '/verify/'
-    | '/faculty/consent/$id'
     | '/faculty/review/$id'
     | '/learn/$slug/$lessonId'
     | '/learn/$slug/exam'
@@ -264,14 +244,12 @@ export interface FileRouteTypes {
     | '/certificates/$certId'
     | '/courses/$slug'
     | '/creator/$id'
-    | '/faculty/consents'
     | '/verify/$certificateId'
     | '/certificates'
     | '/courses'
     | '/creator'
     | '/faculty'
     | '/verify'
-    | '/faculty/consent/$id'
     | '/faculty/review/$id'
     | '/learn/$slug/$lessonId'
     | '/learn/$slug/exam'
@@ -289,14 +267,12 @@ export interface FileRouteTypes {
     | '/certificates/$certId'
     | '/courses/$slug'
     | '/creator/$id'
-    | '/faculty/consents'
     | '/verify/$certificateId'
     | '/certificates/'
     | '/courses/'
     | '/creator/'
     | '/faculty/'
     | '/verify/'
-    | '/faculty/consent/$id'
     | '/faculty/review/$id'
     | '/learn/$slug/$lessonId'
     | '/learn/$slug/exam'
@@ -315,14 +291,12 @@ export interface RootRouteChildren {
   CertificatesCertIdRoute: typeof CertificatesCertIdRoute
   CoursesSlugRoute: typeof CoursesSlugRoute
   CreatorIdRoute: typeof CreatorIdRoute
-  FacultyConsentsRoute: typeof FacultyConsentsRoute
   VerifyCertificateIdRoute: typeof VerifyCertificateIdRoute
   CertificatesIndexRoute: typeof CertificatesIndexRoute
   CoursesIndexRoute: typeof CoursesIndexRoute
   CreatorIndexRoute: typeof CreatorIndexRoute
   FacultyIndexRoute: typeof FacultyIndexRoute
   VerifyIndexRoute: typeof VerifyIndexRoute
-  FacultyConsentIdRoute: typeof FacultyConsentIdRoute
   FacultyReviewIdRoute: typeof FacultyReviewIdRoute
   LearnSlugLessonIdRoute: typeof LearnSlugLessonIdRoute
   LearnSlugExamRoute: typeof LearnSlugExamRoute
@@ -436,13 +410,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FacultyIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/faculty/consents': {
-      id: '/faculty/consents'
-      path: '/faculty/consents'
-      fullPath: '/faculty/consents'
-      preLoaderRoute: typeof FacultyConsentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/verify/': {
       id: '/verify/'
       path: '/verify'
@@ -455,13 +422,6 @@ declare module '@tanstack/react-router' {
       path: '/verify/$certificateId'
       fullPath: '/verify/$certificateId'
       preLoaderRoute: typeof VerifyCertificateIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/faculty/consent/$id': {
-      id: '/faculty/consent/$id'
-      path: '/faculty/consent/$id'
-      fullPath: '/faculty/consent/$id'
-      preLoaderRoute: typeof FacultyConsentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/faculty/review/$id': {
@@ -507,14 +467,12 @@ const rootRouteChildren: RootRouteChildren = {
   CertificatesCertIdRoute: CertificatesCertIdRoute,
   CoursesSlugRoute: CoursesSlugRoute,
   CreatorIdRoute: CreatorIdRoute,
-  FacultyConsentsRoute: FacultyConsentsRoute,
   VerifyCertificateIdRoute: VerifyCertificateIdRoute,
   CertificatesIndexRoute: CertificatesIndexRoute,
   CoursesIndexRoute: CoursesIndexRoute,
   CreatorIndexRoute: CreatorIndexRoute,
   FacultyIndexRoute: FacultyIndexRoute,
   VerifyIndexRoute: VerifyIndexRoute,
-  FacultyConsentIdRoute: FacultyConsentIdRoute,
   FacultyReviewIdRoute: FacultyReviewIdRoute,
   LearnSlugLessonIdRoute: LearnSlugLessonIdRoute,
   LearnSlugExamRoute: LearnSlugExamRoute,
