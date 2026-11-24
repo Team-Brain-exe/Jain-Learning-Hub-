@@ -24,6 +24,7 @@ def test_pdf_extractor_with_real_pdf():
         page1.insert_text((50, 50), "Python compiles source code to bytecode before VM execution.")
         page2 = doc.new_page()
         page2.insert_text((50, 50), "Binary search requires a sorted array and runs in O(log n).")
+        tmp.close()
         doc.save(tmp.name)
         doc.close()
         tmp_path = tmp.name
