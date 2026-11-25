@@ -299,6 +299,11 @@ def get_course_quiz(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No quiz configured for this course.")
 
     if user.role == "student":
+        if course.status != CourseLifecycleStatus.PUBLISHED:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Quiz is not available because the course is not published."
+            )
         enrollment = db.query(Enrollment).filter(
             Enrollment.student_id == user.id,
             Enrollment.course_id == course.id
@@ -427,7 +432,14 @@ def submit_quiz_attempt(
     if not quiz:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found.")
 
-    # Verify student is enrolled in the parent course
+    # Verify student is enrolled in the parent course and course is published
+    course = db.query(Course).filter(Course.id == quiz.course_id).first()
+    if not course or course.status != CourseLifecycleStatus.PUBLISHED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot submit quiz attempt: Course is not published."
+        )
+
     enrollment = db.query(Enrollment).filter(
         Enrollment.student_id == user.id,
         Enrollment.course_id == quiz.course_id
@@ -443,10 +455,17 @@ def submit_quiz_attempt(
     if not questions:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Quiz has no questions configured.")
 
-    # Anti-forgery: Deduplicate answers per question_id and ignore submitted IDs not in this quiz
+    # Anti-forgery: Deduplicate answers per question_id, validate option bounds, and ignore submitted IDs not in this quiz
     deduped_answers = {}
     for submission in payload.answers:
         if submission.question_id in questions:
+            q_obj = questions[submission.question_id]
+            num_options = len(json.loads(q_obj.options_json))
+            if submission.selected_option_index < 0 or submission.selected_option_index >= num_options:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid selected_option_index {submission.selected_option_index} for question '{submission.question_id}'."
+                )
             deduped_answers[submission.question_id] = submission.selected_option_index
 
     correct_count = 0
