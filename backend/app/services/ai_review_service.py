@@ -74,6 +74,11 @@ class AIReviewService:
                         os.path.join(os.getcwd(), "backend", "demo_assets", os.path.basename(file_path)),
                         os.path.join(os.getcwd(), "demo_assets", os.path.basename(file_path)),
                     ]
+                    try:
+                        from app.services.storage_service import StorageService
+                        candidates.insert(0, str(StorageService.resolve_local_path(file_path)))
+                    except Exception:
+                        pass
                     for cand in candidates:
                         if os.path.exists(cand):
                             file_path = cand
