@@ -2,7 +2,9 @@ import pytest
 from app.models.upload_permission import VerifiedFaculty, UploadPermission, PermissionStatus
 
 @pytest.fixture(autouse=True)
-def seed_test_data(db_session):
+def seed_test_data(db_session, tmp_path, monkeypatch):
+    monkeypatch.setenv("STORAGE_LOCAL_DIR", str(tmp_path / "storage_objects"))
+    monkeypatch.setenv("STORAGE_SIGNING_SECRET", "test-storage-signing-secret-32-chars")
     f1 = VerifiedFaculty(id="fac_cse", name="Dr. Rao", email="rao.cse.test@example.com", department="CSE", is_active=True)
     db_session.add(f1)
     
@@ -90,8 +92,13 @@ def test_upload_lifecycle_init_and_finalize_success(client, auth_headers):
     assert init_res.status_code == 201
     init_data = init_res.json()
     assert init_data["upload_status"] == "INITIALIZED"
-    assert "signed-put" in init_data["upload_url"]
+    assert "/api/uploads/storage/" in init_data["upload_url"]
+    assert "sig=" in init_data["upload_url"]
     asset_id = init_data["asset_id"]
+
+    # Upload actual bytes to the signed URL
+    put_res = client.put(init_data["upload_url"], content=b"fake-mp4-video-stream")
+    assert put_res.status_code == 200
 
     final_payload = {
         "permission_id": "perm_appr_101",
@@ -103,6 +110,7 @@ def test_upload_lifecycle_init_and_finalize_success(client, auth_headers):
     assert final_data["upload_status"] == "FINALIZED"
     assert final_data["id"] == asset_id
     assert final_data["uploader_id"] == "student_101"
+    assert final_data["file_size_bytes"] == len(b"fake-mp4-video-stream")
 
 def test_upload_finalize_reverifies_authorization(client, auth_headers):
     init_payload = {
