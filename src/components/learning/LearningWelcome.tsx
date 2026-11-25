@@ -22,7 +22,8 @@ export function LearningWelcome({
   hasEnrollments,
   completedCoursesCount = 0,
 }: LearningWelcomeProps) {
-  const firstName = userName ? userName.trim().split(/\s+/)[0] : "Learner";
+  const trimmedName = userName?.trim();
+  const firstName = trimmedName ? trimmedName.split(/\s+/)[0] : "Learner";
 
   return (
     <section
@@ -30,15 +31,15 @@ export function LearningWelcome({
       className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-card via-card to-secondary/30 p-6 shadow-card sm:p-8"
     >
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div className="max-w-2xl">
-          <div className="flex items-center gap-2">
+        <div className="min-w-0 max-w-2xl">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
               Learner Dashboard
             </span>
             <span className="text-xs text-muted-foreground">JAIN FET Academic Hub</span>
           </div>
 
-          <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
+          <h1 className="mt-2 break-words text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
             Welcome back, <span className="text-primary">{firstName}</span>
           </h1>
 
@@ -55,7 +56,7 @@ export function LearningWelcome({
             {completedCoursesCount > 0 && (
               <Link
                 to="/certificates"
-                className="inline-flex items-center gap-1 font-semibold text-primary hover:underline"
+                className="inline-flex items-center gap-1 font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
               >
                 <Award className="h-4 w-4" />
                 View {completedCoursesCount} earned{" "}
@@ -65,7 +66,7 @@ export function LearningWelcome({
             {completedCoursesCount === 0 && hasEnrollments && (
               <Link
                 to="/certificates"
-                className="inline-flex items-center gap-1 font-semibold text-primary hover:underline"
+                className="inline-flex items-center gap-1 font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
               >
                 <Award className="h-4 w-4" />
                 Certificates directory
@@ -74,7 +75,7 @@ export function LearningWelcome({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
           {topResumable ? (
             <>
               <Link
@@ -94,6 +95,23 @@ export function LearningWelcome({
               >
                 <Compass className="h-4 w-4 text-muted-foreground" />
                 Browse Catalog
+              </Link>
+            </>
+          ) : hasEnrollments ? (
+            <>
+              <Link
+                to="/courses"
+                className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <Compass className="h-4 w-4" />
+                Explore More Courses
+              </Link>
+              <Link
+                to="/certificates"
+                className="inline-flex h-11 items-center gap-2 rounded-lg border border-primary/40 bg-card px-4 text-sm font-semibold text-primary transition hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <Award className="h-4 w-4" />
+                View Certificates
               </Link>
             </>
           ) : (

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Award, Check, ChevronRight, Flag, Plus, Minus, Target } from "lucide-react";
 import { getStoredLearnerGoal, setStoredLearnerGoal } from "@/data/learning";
@@ -20,13 +20,21 @@ export function LearningGoalsPanel({
 }: LearningGoalsPanelProps) {
   const [goal, setGoal] = useState<number>(() => getStoredLearnerGoal());
   const [savedNotice, setSavedNotice] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   const handleUpdateGoal = (newGoal: number) => {
     const val = Math.max(1, Math.min(30, newGoal));
     setGoal(val);
     setStoredLearnerGoal(val);
     setSavedNotice(true);
-    setTimeout(() => setSavedNotice(false), 2000);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setSavedNotice(false), 2000);
   };
 
   const currentProgress = Math.min(totalLessonsDone, goal);
@@ -82,13 +90,13 @@ export function LearningGoalsPanel({
         {/* Goal adjustment controls */}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-border/60">
           <span className="text-xs text-muted-foreground">Adjust weekly target:</span>
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             {[3, 5, 8, 12].map((preset) => (
               <button
                 key={preset}
                 type="button"
                 onClick={() => handleUpdateGoal(preset)}
-                className={`rounded px-2.5 py-1 text-xs font-semibold transition ${
+                className={`min-h-8 min-w-8 rounded px-2.5 py-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                   goal === preset
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground hover:bg-muted/80"
@@ -102,20 +110,20 @@ export function LearningGoalsPanel({
               <button
                 type="button"
                 onClick={() => handleUpdateGoal(goal - 1)}
-                className="p-1 hover:bg-muted text-muted-foreground hover:text-foreground"
+                className="inline-flex h-8 w-8 items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-40"
                 aria-label="Decrease target"
                 disabled={goal <= 1}
               >
-                <Minus className="h-3 w-3" />
+                <Minus className="h-3.5 w-3.5" />
               </button>
               <button
                 type="button"
                 onClick={() => handleUpdateGoal(goal + 1)}
-                className="p-1 hover:bg-muted text-muted-foreground hover:text-foreground"
+                className="inline-flex h-8 w-8 items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-40"
                 aria-label="Increase target"
                 disabled={goal >= 30}
               >
-                <Plus className="h-3 w-3" />
+                <Plus className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
@@ -130,7 +138,7 @@ export function LearningGoalsPanel({
       {/* Next Milestone / Certificate Section */}
       <div className="mt-6 pt-5 border-t border-border space-y-3">
         <div className="flex items-center gap-2">
-          <Flag className="h-4 w-4 text-amber-500" />
+          <Flag className="h-4 w-4 text-amber-600" />
           <h3 className="text-sm font-bold text-foreground">Next Milestone</h3>
         </div>
 
@@ -157,10 +165,10 @@ export function LearningGoalsPanel({
         <div className="pt-2">
           <Link
             to="/certificates"
-            className="group flex items-center justify-between rounded-xl border border-border bg-gradient-to-r from-card to-secondary/30 p-3 text-xs font-semibold text-foreground transition hover:border-primary/40 hover:bg-secondary/50"
+            className="group flex items-center justify-between rounded-xl border border-border bg-gradient-to-r from-card to-secondary/30 p-3 text-xs font-semibold text-foreground transition hover:border-primary/40 hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <div className="flex items-center gap-2">
-              <Award className="h-4 w-4 text-gold shrink-0" />
+              <Award className="h-4 w-4 text-amber-600 shrink-0" />
               <span>
                 {completedCoursesCount > 0
                   ? `View ${completedCoursesCount} Certificate${completedCoursesCount > 1 ? "s" : ""}`

@@ -46,13 +46,16 @@ export function LearningActivityPanel({ items }: LearningActivityPanelProps) {
       ) : (
         <ul className="mt-4 divide-y divide-border" role="list">
           {items.map((item) => (
-            <li key={`${item.course.slug}-${item.lessonId}`} className="py-3 first:pt-0 last:pb-0">
+            <li
+              key={`${item.course.slug}-${item.lessonId}`}
+              className="min-w-0 py-3 first:pt-0 last:pb-0"
+            >
               <Link
                 to="/learn/$slug/$lessonId"
                 params={{ slug: item.course.slug, lessonId: item.lessonId }}
-                className="group flex flex-col gap-2 rounded-lg p-2.5 transition hover:bg-muted/70 sm:flex-row sm:items-center sm:justify-between"
+                className="group flex flex-col gap-2 rounded-lg p-2.5 transition hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
-                <div className="flex items-start gap-3 min-w-0 flex-1">
+                <div className="flex items-start gap-3 min-w-0">
                   <span
                     className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
                     aria-hidden="true"
@@ -69,14 +72,19 @@ export function LearningActivityPanel({ items }: LearningActivityPanelProps) {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 text-xs pl-11 sm:pl-0">
+                <div className="flex items-center justify-between gap-2 pl-11 text-xs">
                   <span className="font-semibold text-foreground/80">
                     {item.progressPercent}% complete
                   </span>
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">
-                    {formatActivityTime(item.timestamp)}
-                  </span>
-                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity hidden sm:block" />
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">
+                      {formatActivityTime(item.timestamp)}
+                    </span>
+                    <ExternalLink
+                      className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors"
+                      aria-hidden="true"
+                    />
+                  </div>
                 </div>
               </Link>
             </li>

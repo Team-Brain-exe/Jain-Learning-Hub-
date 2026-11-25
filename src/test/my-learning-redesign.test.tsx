@@ -95,6 +95,12 @@ describe("Learning Dashboard Redesign Components", () => {
       expect(screen.getByText("Learner")).toBeInTheDocument();
     });
 
+    it("handles whitespace-only user names gracefully", () => {
+      render(<LearningWelcome userName="   " topResumable={null} hasEnrollments={false} />);
+
+      expect(screen.getByText("Learner")).toBeInTheDocument();
+    });
+
     it("displays prominent Continue Learning button when topResumable is provided", () => {
       render(
         <LearningWelcome
@@ -416,6 +422,11 @@ describe("Learning Dashboard Redesign Components", () => {
 
       expect(screen.getByText("Completed Courses")).toBeInTheDocument();
       expect(screen.getByText("100% Completed • All lessons finished")).toBeInTheDocument();
+      expect(screen.queryByLabelText("Continue Learning Spotlight")).not.toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /explore more courses/i })).toHaveAttribute(
+        "href",
+        "/courses",
+      );
       expect(screen.getByRole("link", { name: "Review" })).toHaveAttribute(
         "href",
         "/learn/python-programming-fundamentals/1-1",
@@ -423,6 +434,37 @@ describe("Learning Dashboard Redesign Components", () => {
       const certificateLinks = screen.getAllByRole("link", { name: /certificate/i });
       expect(certificateLinks.length).toBeGreaterThan(0);
       expect(certificateLinks[0]).toHaveAttribute("href", "/certificates");
+    });
+
+    it("State D: handles missing lesson IDs and missing timestamps without crashing", () => {
+      vi.mocked(useAuth).mockReturnValue({
+        user: { id: "u4", name: "Meera", email: "meera@jain.edu", role: "learner" },
+        role: "learner",
+        token: null,
+        isSignedIn: true,
+      });
+
+      vi.mocked(useAllCourses).mockReturnValue(courses);
+      vi.mocked(useLearner).mockReturnValue({
+        enrolled: ["python-programming-fundamentals", "data-structures-and-algorithms"],
+        completed: {
+          "python-programming-fundamentals": ["1-1"],
+        },
+        last: {
+          "python-programming-fundamentals": "99-99",
+          "data-structures-and-algorithms": "1-1",
+        },
+        accessed: {
+          "data-structures-and-algorithms": Date.now() - 1000 * 60 * 5,
+        },
+      });
+
+      render(<MyLearningComponent />);
+
+      expect(screen.getByText("Lesson 99-99")).toBeInTheDocument();
+      expect(screen.getAllByText("Big-O Notation").length).toBeGreaterThanOrEqual(2);
+      expect(screen.getByText("5m ago")).toBeInTheDocument();
+      expect(screen.getByText("Recently")).toBeInTheDocument();
     });
   });
 });

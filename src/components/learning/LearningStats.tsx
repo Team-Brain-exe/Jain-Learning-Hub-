@@ -28,8 +28,8 @@ export function LearningStats({
       label: "In Progress",
       value: inProgressCount,
       icon: Clock,
-      iconColor: "text-amber-500",
-      bgColor: "bg-amber-500/10",
+      iconColor: "text-amber-600",
+      bgColor: "bg-amber-500/15",
       description: "Active coursework",
     },
     {
@@ -46,8 +46,8 @@ export function LearningStats({
       label: "Courses Completed",
       value: completedCount,
       icon: Trophy,
-      iconColor: "text-gold",
-      bgColor: "bg-gold/15",
+      iconColor: "text-amber-600",
+      bgColor: "bg-amber-500/15",
       description: "Certificates earned",
     },
   ];

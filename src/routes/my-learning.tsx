@@ -62,12 +62,17 @@ function MyLearning() {
   const courses = useAllCourses();
   const { user } = useAuth();
 
-  // Derive existing data structures
-  const enrolled = courses.filter((c) => s.enrolled.includes(c.slug));
+  // Derive existing data structures safely
+  const enrolledList = Array.isArray(s.enrolled) ? s.enrolled : [];
+  const completedMap = s.completed ?? {};
+  const lastMap = s.last ?? {};
+  const accessedMap = s.accessed ?? {};
+
+  const enrolled = courses.filter((c) => enrolledList.includes(c.slug));
   const withP = enrolled.map((c) => ({
     c,
-    p: courseProgress(c, s.completed[c.slug]),
-    resume: resumeLessonId(c, s.last[c.slug], s.completed[c.slug]),
+    p: courseProgress(c, completedMap[c.slug]),
+    resume: resumeLessonId(c, lastMap[c.slug], completedMap[c.slug]),
   }));
 
   const inProgress = withP.filter((x) => x.p.percent < 100);
@@ -75,12 +80,12 @@ function MyLearning() {
 
   // Recent activity ordered by accessed timestamp
   const recent = [...withP]
-    .filter((x) => s.last[x.c.slug])
-    .sort((a, b) => (s.accessed[b.c.slug] ?? 0) - (s.accessed[a.c.slug] ?? 0));
+    .filter((x) => Boolean(lastMap[x.c.slug]))
+    .sort((a, b) => (accessedMap[b.c.slug] ?? 0) - (accessedMap[a.c.slug] ?? 0));
 
-  // Top course to resume (prioritize active in-progress course with recent activity)
+  // Top course to resume (only spotlight in-progress courses; never show completed courses as in-progress)
   const top =
-    inProgress.length > 0 ? (recent.find((r) => r.p.percent < 100) ?? inProgress[0]) : recent[0];
+    inProgress.length > 0 ? (recent.find((r) => r.p.percent < 100) ?? inProgress[0]) : undefined;
 
   const lessonsDone = withP.reduce((n, x) => n + x.p.done, 0);
 
@@ -91,10 +96,10 @@ function MyLearning() {
 
   const recentActivityItems = recent.map(({ c, p }) => ({
     course: c,
-    lessonId: s.last[c.slug]!,
-    lessonTitle: getLessonName(c, s.last[c.slug]!) || `Lesson ${s.last[c.slug]}`,
+    lessonId: lastMap[c.slug]!,
+    lessonTitle: getLessonName(c, lastMap[c.slug]!) || `Lesson ${lastMap[c.slug]}`,
     progressPercent: p.percent,
-    timestamp: s.accessed[c.slug],
+    timestamp: accessedMap[c.slug],
   }));
 
   return (
@@ -172,7 +177,7 @@ function MyLearning() {
             {/* Dashboard Content Grid */}
             <div className="grid gap-8 lg:grid-cols-3">
               {/* Main Column (2 of 3 columns on large screens) */}
-              <div className="space-y-8 lg:col-span-2">
+              <div className="min-w-0 space-y-8 lg:col-span-2">
                 {/* In Progress Courses (State B) */}
                 <section aria-labelledby="in-progress-heading">
                   <div className="flex items-center justify-between pb-3 border-b border-border">
@@ -241,7 +246,7 @@ function MyLearning() {
                                 className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-xs transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                               >
                                 <PlayCircle className="h-3.5 w-3.5" />
-                                {p.done || s.last[c.slug] ? "Continue Learning" : "Start Course"}
+                                {p.done || lastMap[c.slug] ? "Continue Learning" : "Start Course"}
                               </Link>
                             </div>
                           </div>
@@ -271,7 +276,7 @@ function MyLearning() {
                 <section aria-labelledby="completed-heading">
                   <div className="flex items-center justify-between pb-3 border-b border-border">
                     <div className="flex items-center gap-2">
-                      <Award className="h-5 w-5 text-gold" />
+                      <Award className="h-5 w-5 text-amber-600" />
                       <h2
                         id="completed-heading"
                         className="text-lg font-bold tracking-tight text-foreground sm:text-xl"
@@ -310,15 +315,15 @@ function MyLearning() {
                             <Link
                               to="/learn/$slug/$lessonId"
                               params={{ slug: c.slug, lessonId: "1-1" }}
-                              className="inline-flex h-8 items-center rounded-md border border-border bg-background px-3 text-foreground hover:bg-muted"
+                              className="inline-flex h-9 items-center rounded-md border border-border bg-background px-3 text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                             >
                               Review
                             </Link>
                             <Link
                               to="/certificates"
-                              className="inline-flex h-8 items-center gap-1 rounded-md bg-secondary px-3 text-primary hover:bg-secondary/80"
+                              className="inline-flex h-9 items-center gap-1 rounded-md bg-secondary px-3 text-primary hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                             >
-                              <Award className="h-3.5 w-3.5 text-gold" />
+                              <Award className="h-3.5 w-3.5 text-amber-600" />
                               Certificate
                             </Link>
                           </div>
@@ -337,7 +342,7 @@ function MyLearning() {
               </div>
 
               {/* Sidebar Column (1 of 3 columns on large screens) */}
-              <div className="space-y-8">
+              <div className="min-w-0 space-y-8">
                 {/* M-5: Learning Goals Panel */}
                 <LearningGoalsPanel
                   totalLessonsDone={lessonsDone}

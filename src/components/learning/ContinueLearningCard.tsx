@@ -27,7 +27,7 @@ export function ContinueLearningCard({
       className="overflow-hidden rounded-2xl border border-navy/30 bg-navy text-navy-foreground shadow-card"
     >
       <div className="grid md:grid-cols-[280px_1fr] lg:grid-cols-[320px_1fr]">
-        <div className="relative aspect-[16/9] w-full overflow-hidden bg-navy-foreground/10 md:h-full md:aspect-auto">
+        <div className="relative min-w-0 aspect-[16/9] w-full overflow-hidden bg-navy-foreground/10 md:h-full md:aspect-auto">
           <img
             src={course.thumbnail}
             alt={course.title}
@@ -40,7 +40,7 @@ export function ContinueLearningCard({
           </div>
         </div>
 
-        <div className="flex flex-col justify-between p-6 sm:p-7">
+        <div className="flex min-w-0 flex-col justify-between p-6 sm:p-7">
           <div>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-gold">
@@ -49,14 +49,16 @@ export function ContinueLearningCard({
               <span className="text-xs text-navy-foreground/70">{course.instructor.name}</span>
             </div>
 
-            <h2 className="mt-2 text-xl font-bold tracking-tight text-white sm:text-2xl">
+            <h2 className="mt-2 break-words text-xl font-bold tracking-tight text-white sm:text-2xl">
               {course.title}
             </h2>
 
-            <div className="mt-2 flex items-center gap-2 text-sm text-navy-foreground/90">
+            <div className="mt-2 flex items-center gap-2 text-sm text-navy-foreground/90 min-w-0">
               <BookOpen className="h-4 w-4 shrink-0 text-gold" />
-              <span className="font-medium text-white">Next Lesson:</span>
-              <span className="line-clamp-1 font-semibold text-gold">
+              <span className="shrink-0 font-medium text-white">
+                {isComplete ? "Review From:" : "Next Lesson:"}
+              </span>
+              <span className="truncate font-semibold text-gold">
                 {nextLessonTitle || `Lesson ${resumeLessonId}`}
               </span>
             </div>
