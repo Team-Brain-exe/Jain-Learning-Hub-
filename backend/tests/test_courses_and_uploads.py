@@ -86,7 +86,7 @@ def test_upload_lifecycle_init_and_finalize_success(client, auth_headers):
         "file_name": "binary_trees.mp4",
         "file_type": "video",
         "mime_type": "video/mp4",
-        "file_size_bytes": 25 * 1024 * 1024
+        "file_size_bytes": len(b"fake-mp4-video-stream")
     }
     init_res = client.post("/api/uploads/request", json=init_payload, headers=auth_headers["student_101"])
     assert init_res.status_code == 201

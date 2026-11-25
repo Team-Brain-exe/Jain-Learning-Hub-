@@ -119,10 +119,10 @@ async def upload_object_to_signed_url(
         sig=sig,
     )
 
-    if asset.upload_status == UploadSessionStatus.FINALIZED:
+    if asset.upload_status != UploadSessionStatus.INITIALIZED:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Upload session has already been finalized.",
+            detail="Upload session is not in an initialized state.",
         )
 
     body = await request.body()
@@ -212,6 +212,11 @@ def finalize_file_upload(
             status_code=status.HTTP_409_CONFLICT,
             detail="Duplicate finalization: Media asset is already finalized.",
         )
+    if asset.upload_status != UploadSessionStatus.INITIALIZED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Upload session is not in an initialized state.",
+        )
 
     # 3. Verify actual object existence and size in storage
     max_bytes = MAX_FILE_SIZE_BYTES[asset.file_type]
@@ -219,7 +224,16 @@ def finalize_file_upload(
         storage_key=asset.storage_key,
         max_bytes=max_bytes,
     )
+
+    if exists_ok and actual_size != asset.file_size_bytes:
+        exists_ok = False
+        err_reason = (
+            f"Uploaded size mismatch: expected {asset.file_size_bytes} bytes, "
+            f"received {actual_size} bytes."
+        )
+
     now = datetime.now(timezone.utc)
+
     if not exists_ok:
         asset.upload_status = UploadSessionStatus.FAILED
         asset.updated_at = now

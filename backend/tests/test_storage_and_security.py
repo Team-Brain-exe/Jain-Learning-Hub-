@@ -155,7 +155,49 @@ def test_failed_upload_finalize_missing_object_and_duplicate_finalization(client
     failed_asset = db_session.query(MediaAsset).filter(MediaAsset.id == init_missing["asset_id"]).first()
     assert failed_asset.upload_status == UploadSessionStatus.FAILED
 
-    # 2. Initialize, PUT real bytes, finalize -> 200 OK, then duplicate finalize -> 409 Conflict
+    # A failed upload session must not accept more bytes.
+    put_failed = client.put(
+        init_missing["upload_url"],
+        content=b"%PDF-1.4 retry",
+    )
+    assert put_failed.status_code == 409
+
+    # 2. Declared size must match the actual uploaded size.
+    init_mismatch = client.post(
+        "/api/uploads/request",
+        json={
+            "permission_id": "perm_sec_appr",
+            "file_name": "mismatch.pdf",
+            "file_type": "pdf",
+            "mime_type": "application/pdf",
+            "file_size_bytes": 100,
+        },
+        headers=auth_headers["student_101"],
+    ).json()
+
+    put_mismatch = client.put(
+        init_mismatch["upload_url"],
+        content=b"%PDF-1.4 content",
+    )
+    assert put_mismatch.status_code == 200
+
+    fin_mismatch = client.post(
+        "/api/uploads/finalize",
+        json={
+            "permission_id": "perm_sec_appr",
+            "asset_id": init_mismatch["asset_id"],
+        },
+        headers=auth_headers["student_101"],
+    )
+    assert fin_mismatch.status_code == 400
+    assert "size mismatch" in fin_mismatch.json()["detail"].lower()
+
+    mismatch_asset = db_session.query(MediaAsset).filter(
+        MediaAsset.id == init_mismatch["asset_id"]
+    ).first()
+    assert mismatch_asset.upload_status == UploadSessionStatus.FAILED
+
+    # 3. Initialize, PUT real bytes, finalize -> 200 OK, then duplicate finalize -> 409 Conflict
     init_ok = client.post(
         "/api/uploads/request",
         json={
