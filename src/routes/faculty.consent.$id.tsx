@@ -3,12 +3,12 @@ import { useEffect, useState } from "react";
 import {
   fetchFacultyPermissionDetail,
   submitFacultyPermissionDecision,
-  type FacultyUploadPermissionItem,
+  type UploadPermissionResponse,
 } from "@/lib/api-client";
+import { UploadPermissionBadge } from "@/components/consent/UploadPermissionBadge";
 import {
   PageHeader,
   RequireRole,
-  StatusBadge,
   btn,
   btnOutline,
   fmtDateTime,
@@ -28,6 +28,9 @@ import {
   Clock,
 } from "lucide-react";
 
+const toBadgeStatus = (s: UploadPermissionResponse["status"]) =>
+  s === "APPROVED" ? "approved" : s === "REJECTED" ? "rejected" : "pending";
+
 export const Route = createFileRoute("/faculty/consent/$id")({
   component: FacultyConsentDetailPage,
 });
@@ -44,7 +47,7 @@ function FacultyConsentDetailPage() {
 
 function FacultyConsentDetailContent({ id }: { id: string }) {
   const navigate = useNavigate();
-  const [item, setItem] = useState<FacultyUploadPermissionItem | null>(null);
+  const [item, setItem] = useState<UploadPermissionResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,7 +70,7 @@ function FacultyConsentDetailContent({ id }: { id: string }) {
       setError(
         err instanceof Error
           ? err.message
-          : "Failed to load upload permission details. The request may not exist or is not assigned to you."
+          : "Failed to load upload permission details. The request may not exist or is not assigned to you.",
       );
     } finally {
       setLoading(false);
@@ -95,13 +98,13 @@ function FacultyConsentDetailContent({ id }: { id: string }) {
       });
       setItem(updated);
       setActionSuccess(
-        `Permission request successfully ${decision === "APPROVED" ? "approved" : "rejected"}.`
+        `Permission request successfully ${decision === "APPROVED" ? "approved" : "rejected"}.`,
       );
     } catch (err) {
       setActionError(
         err instanceof Error
           ? err.message
-          : `Failed to ${decision.toLowerCase()} permission request. Please try again.`
+          : `Failed to ${decision.toLowerCase()} permission request. Please try again.`,
       );
     } finally {
       setSubmitting(false);
@@ -137,7 +140,10 @@ function FacultyConsentDetailContent({ id }: { id: string }) {
             <h3 className="font-semibold">Unable to Load Permission Request</h3>
             <p className="text-xs opacity-90">{error || "Permission request not found."}</p>
             <div className="pt-2">
-              <button onClick={loadData} className={`${btnOutline} border-destructive/30 bg-background text-xs`}>
+              <button
+                onClick={loadData}
+                className={`${btnOutline} border-destructive/30 bg-background text-xs`}
+              >
                 Retry
               </button>
             </div>
@@ -148,8 +154,6 @@ function FacultyConsentDetailContent({ id }: { id: string }) {
   }
 
   const isPending = item.status === "PENDING";
-  const isApproved = item.status === "APPROVED";
-  const isRejected = item.status === "REJECTED";
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-6">
@@ -165,9 +169,9 @@ function FacultyConsentDetailContent({ id }: { id: string }) {
       </div>
 
       <PageHeader
-        title={item.courseTitle || item.title || "Faculty Upload Permission Review"}
-        description={`Permission ID: ${item.id}`}
-        action={<StatusBadge status={item.status} />}
+        title={item.title || "Faculty Upload Permission Review"}
+        subtitle={`Permission ID: ${item.id}`}
+        actions={<UploadPermissionBadge status={toBadgeStatus(item.status)} />}
       />
 
       {/* Success Banner */}
@@ -194,11 +198,8 @@ function FacultyConsentDetailContent({ id }: { id: string }) {
             <div>
               <p className="text-xs font-medium text-muted-foreground">Student Requester</p>
               <p className="text-sm font-semibold text-foreground">
-                {item.studentName || item.studentId || item.userId || "Not Specified"}
+                {item.student_id || "Not Specified"}
               </p>
-              {item.studentId && item.studentName && (
-                <p className="text-xs font-mono text-muted-foreground">ID: {item.studentId}</p>
-              )}
             </div>
           </div>
 
@@ -208,32 +209,16 @@ function FacultyConsentDetailContent({ id }: { id: string }) {
               <p className="text-xs font-medium text-muted-foreground">Content Specification</p>
               <div className="mt-1 flex flex-wrap gap-1.5">
                 <span className="rounded bg-muted px-2 py-0.5 text-xs font-mono font-medium uppercase text-foreground">
-                  {item.contentType || item.materialType || "MATERIAL"}
+                  {item.content_type || "MATERIAL"}
                 </span>
-                {item.expectedFormat && (
+                {item.format && (
                   <span className="rounded border border-border px-2 py-0.5 text-xs font-mono uppercase text-muted-foreground">
-                    Format: {item.expectedFormat}
+                    Format: {item.format}
                   </span>
                 )}
-                {item.fileSizeBytes ? (
-                  <span className="rounded border border-border px-2 py-0.5 text-xs text-muted-foreground">
-                    ~{(item.fileSizeBytes / (1024 * 1024)).toFixed(1)} MB
-                  </span>
-                ) : null}
               </div>
             </div>
           </div>
-
-          {item.courseId && (
-            <div className="flex items-start gap-3">
-              <FileText className="mt-0.5 h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">Associated Course</p>
-                <p className="text-sm text-foreground">{item.courseTitle || "Course Title"}</p>
-                <code className="text-[11px] font-mono text-muted-foreground">{item.courseId}</code>
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="space-y-4">
@@ -243,12 +228,12 @@ function FacultyConsentDetailContent({ id }: { id: string }) {
               <p className="text-xs font-medium text-muted-foreground">Timestamps</p>
               <p className="text-xs text-foreground">
                 <span className="text-muted-foreground">Requested:</span>{" "}
-                {item.createdAt ? fmtDateTime(item.createdAt) : "N/A"}
+                {item.created_at ? fmtDateTime(item.created_at) : "N/A"}
               </p>
-              {item.decidedAt && (
+              {item.decision_timestamp && (
                 <p className="text-xs text-foreground">
                   <span className="text-muted-foreground">Decided:</span>{" "}
-                  {fmtDateTime(item.decidedAt)}
+                  {fmtDateTime(item.decision_timestamp)}
                 </p>
               )}
             </div>
@@ -259,18 +244,18 @@ function FacultyConsentDetailContent({ id }: { id: string }) {
             <div>
               <p className="text-xs font-medium text-muted-foreground">Assigned Reviewer</p>
               <p className="text-xs text-foreground">
-                {item.facultyId ? `Faculty ID: ${item.facultyId}` : "Assigned to You"}
+                {item.faculty_id ? `Faculty ID: ${item.faculty_id}` : "Assigned to You"}
               </p>
             </div>
           </div>
 
-          {item.consentDeclaredAt && (
+          {item.consent_declared_at && (
             <div className="flex items-start gap-3">
               <Clock className="mt-0.5 h-4 w-4 text-muted-foreground" />
               <div>
                 <p className="text-xs font-medium text-muted-foreground">Student Declaration</p>
                 <p className="text-xs text-foreground">
-                  Consent confirmed on {fmtDateTime(item.consentDeclaredAt)}
+                  Consent confirmed on {fmtDateTime(item.consent_declared_at)}
                 </p>
               </div>
             </div>
@@ -301,10 +286,10 @@ function FacultyConsentDetailContent({ id }: { id: string }) {
           <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-muted-foreground">Current Status:</span>
-              <StatusBadge status={item.status} />
-              {item.decidedAt && (
+              <UploadPermissionBadge status={toBadgeStatus(item.status)} />
+              {item.decision_timestamp && (
                 <span className="text-xs text-muted-foreground">
-                  on {fmtDateTime(item.decidedAt)}
+                  on {fmtDateTime(item.decision_timestamp)}
                 </span>
               )}
             </div>
@@ -328,7 +313,8 @@ function FacultyConsentDetailContent({ id }: { id: string }) {
                 htmlFor="faculty-remarks"
                 className="text-xs font-medium text-muted-foreground"
               >
-                Feedback / Remarks <span className="text-muted-foreground/70">(Mandatory if rejecting)</span>
+                Feedback / Remarks{" "}
+                <span className="text-muted-foreground/70">(Mandatory if rejecting)</span>
               </label>
               <textarea
                 id="faculty-remarks"
@@ -377,4 +363,3 @@ function FacultyConsentDetailContent({ id }: { id: string }) {
     </div>
   );
 }
-

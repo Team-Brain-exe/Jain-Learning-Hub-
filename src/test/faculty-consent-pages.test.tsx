@@ -1,3 +1,4 @@
+import type { ComponentType } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import * as apiClient from "@/lib/api-client";
@@ -5,7 +6,8 @@ import * as useAuthModule from "@/hooks/use-auth";
 
 // Mock tanstack router components and hooks
 vi.mock("@tanstack/react-router", () => ({
-  createFileRoute: (path: string) => {
+  createFileRoute: () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (options: any) => {
       const Comp = options.component;
       Comp.useParams = () => ({ id: "perm-123" });
@@ -15,6 +17,7 @@ vi.mock("@tanstack/react-router", () => ({
       };
     };
   },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Link: ({ children, to, params, className }: any) => (
     <a href={to} data-params={JSON.stringify(params)} className={className}>
       {children}
@@ -36,6 +39,7 @@ vi.spyOn(useAuthModule, "useAuth").mockReturnValue({
   signup: vi.fn(),
   logout: vi.fn(),
   isLoading: false,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } as any);
 
 describe("Faculty Consent Pages", () => {
@@ -48,33 +52,37 @@ describe("Faculty Consent Pages", () => {
       vi.spyOn(apiClient, "fetchFacultyAssignedPermissions").mockResolvedValueOnce([
         {
           id: "perm-1",
-          courseId: "course-101",
-          courseTitle: "Data Structures & Algorithms",
-          studentId: "student-42",
-          studentName: "Aarav Sharma",
-          contentType: "PDF_DOCUMENT",
-          expectedFormat: "pdf",
+          student_id: "student-42",
+          faculty_id: "fac-1",
+          title: "Data Structures & Algorithms",
+          content_type: "PDF_DOCUMENT",
+          format: "pdf",
           description: "Chapter 1 supplementary notes",
+          consent_declared: true,
+          consent_declared_at: "2026-11-20T10:00:00Z",
           status: "PENDING",
-          createdAt: "2026-11-20T10:00:00Z",
+          created_at: "2026-11-20T10:00:00Z",
+          updated_at: "2026-11-20T10:00:00Z",
         },
         {
           id: "perm-2",
-          courseId: "course-102",
-          courseTitle: "Web Architecture",
-          studentId: "student-43",
-          studentName: "Priya Patel",
-          contentType: "VIDEO_LECTURE",
-          expectedFormat: "mp4",
+          student_id: "student-43",
+          faculty_id: "fac-1",
+          title: "Web Architecture",
+          content_type: "VIDEO_LECTURE",
+          format: "mp4",
           description: "Introductory module video",
+          consent_declared: true,
+          consent_declared_at: "2026-11-21T10:00:00Z",
           status: "APPROVED",
-          createdAt: "2026-11-21T10:00:00Z",
-          decidedAt: "2026-11-22T10:00:00Z",
+          created_at: "2026-11-21T10:00:00Z",
+          decision_timestamp: "2026-11-22T10:00:00Z",
+          updated_at: "2026-11-22T10:00:00Z",
         },
       ]);
 
       const { Route } = await import("@/routes/faculty.consents");
-      const Component = Route.component;
+      const Component = (Route as unknown as { component: ComponentType }).component;
 
       render(<Component />);
 
@@ -83,8 +91,8 @@ describe("Faculty Consent Pages", () => {
       await waitFor(() => {
         expect(screen.getByText("Data Structures & Algorithms")).toBeInTheDocument();
         expect(screen.getByText("Web Architecture")).toBeInTheDocument();
-        expect(screen.getByText("Aarav Sharma")).toBeInTheDocument();
-        expect(screen.getByText("Priya Patel")).toBeInTheDocument();
+        expect(screen.getByText("student-42")).toBeInTheDocument();
+        expect(screen.getByText("student-43")).toBeInTheDocument();
       });
     });
 
@@ -92,7 +100,7 @@ describe("Faculty Consent Pages", () => {
       vi.spyOn(apiClient, "fetchFacultyAssignedPermissions").mockResolvedValueOnce([]);
 
       const { Route } = await import("@/routes/faculty.consents");
-      const Component = Route.component;
+      const Component = (Route as unknown as { component: ComponentType }).component;
 
       render(<Component />);
 
@@ -103,11 +111,11 @@ describe("Faculty Consent Pages", () => {
 
     it("displays error message when API fails", async () => {
       vi.spyOn(apiClient, "fetchFacultyAssignedPermissions").mockRejectedValueOnce(
-        new Error("Network connection failed")
+        new Error("Network connection failed"),
       );
 
       const { Route } = await import("@/routes/faculty.consents");
-      const Component = Route.component;
+      const Component = (Route as unknown as { component: ComponentType }).component;
 
       render(<Component />);
 
@@ -122,46 +130,53 @@ describe("Faculty Consent Pages", () => {
     it("renders detail view with pending status and allows approve action", async () => {
       vi.spyOn(apiClient, "fetchFacultyPermissionDetail").mockResolvedValueOnce({
         id: "perm-123",
-        courseId: "course-101",
-        courseTitle: "Cloud Computing Systems",
-        studentId: "student-99",
-        studentName: "Neha Reddy",
-        contentType: "LAB_MANUAL",
-        expectedFormat: "pdf",
+        student_id: "student-99",
+        faculty_id: "fac-1",
+        title: "Permission request",
+        content_type: "LAB_MANUAL",
+        format: "pdf",
         description: "Hands-on Docker lab guide for students",
+        consent_declared: true,
+        consent_declared_at: "2026-11-24T08:05:00Z",
         status: "PENDING",
-        createdAt: "2026-11-24T08:00:00Z",
-        consentDeclaredAt: "2026-11-24T08:05:00Z",
+        created_at: "2026-11-24T08:00:00Z",
+        updated_at: "2026-11-24T08:05:00Z",
       });
 
-      const submitSpy = vi.spyOn(apiClient, "submitFacultyPermissionDecision").mockResolvedValueOnce({
-        id: "perm-123",
-        courseId: "course-101",
-        courseTitle: "Cloud Computing Systems",
-        studentId: "student-99",
-        studentName: "Neha Reddy",
-        contentType: "LAB_MANUAL",
-        expectedFormat: "pdf",
-        description: "Hands-on Docker lab guide for students",
-        status: "APPROVED",
-        remarks: "Looks comprehensive, approved for upload.",
-        createdAt: "2026-11-24T08:00:00Z",
-        decidedAt: "2026-11-24T09:00:00Z",
-      });
+      const submitSpy = vi
+        .spyOn(apiClient, "submitFacultyPermissionDecision")
+        .mockResolvedValueOnce({
+          id: "perm-123",
+          student_id: "student-99",
+          faculty_id: "fac-1",
+          title: "Permission request",
+          content_type: "LAB_MANUAL",
+          format: "pdf",
+          description: "Hands-on Docker lab guide for students",
+          consent_declared: true,
+          consent_declared_at: "2026-11-24T08:05:00Z",
+          status: "APPROVED",
+          remarks: "Looks comprehensive, approved for upload.",
+          created_at: "2026-11-24T08:00:00Z",
+          decision_timestamp: "2026-11-24T09:00:00Z",
+          updated_at: "2026-11-24T09:00:00Z",
+        });
 
       const { Route } = await import("@/routes/faculty.consent.$id");
-      const Component = Route.component;
+      const Component = (Route as unknown as { component: ComponentType }).component;
 
       render(<Component />);
 
       await waitFor(() => {
-        expect(screen.getAllByText("Cloud Computing Systems").length).toBeGreaterThan(0);
-        expect(screen.getByText("Neha Reddy")).toBeInTheDocument();
+        expect(screen.getAllByText("Permission request").length).toBeGreaterThan(0);
+        expect(screen.getByText("student-99")).toBeInTheDocument();
         expect(screen.getByText(/Hands-on Docker lab guide/i)).toBeInTheDocument();
       });
 
       const remarksInput = screen.getByLabelText(/Feedback \/ Remarks/i);
-      fireEvent.change(remarksInput, { target: { value: "Looks comprehensive, approved for upload." } });
+      fireEvent.change(remarksInput, {
+        target: { value: "Looks comprehensive, approved for upload." },
+      });
 
       const approveBtn = screen.getByRole("button", { name: /Approve Permission/i });
       fireEvent.click(approveBtn);
@@ -178,21 +193,23 @@ describe("Faculty Consent Pages", () => {
     it("requires remarks when rejecting a permission request", async () => {
       vi.spyOn(apiClient, "fetchFacultyPermissionDetail").mockResolvedValueOnce({
         id: "perm-123",
-        courseId: "course-101",
-        courseTitle: "Cloud Computing Systems",
-        studentId: "student-99",
-        studentName: "Neha Reddy",
-        contentType: "LAB_MANUAL",
-        expectedFormat: "pdf",
+        student_id: "student-99",
+        faculty_id: "fac-1",
+        title: "Permission request",
+        content_type: "LAB_MANUAL",
+        format: "pdf",
         description: "Hands-on Docker lab guide",
+        consent_declared: true,
+        consent_declared_at: "2026-11-24T08:00:00Z",
         status: "PENDING",
-        createdAt: "2026-11-24T08:00:00Z",
+        created_at: "2026-11-24T08:00:00Z",
+        updated_at: "2026-11-24T08:00:00Z",
       });
 
       const submitSpy = vi.spyOn(apiClient, "submitFacultyPermissionDecision");
 
       const { Route } = await import("@/routes/faculty.consent.$id");
-      const Component = Route.component;
+      const Component = (Route as unknown as { component: ComponentType }).component;
 
       render(<Component />);
 
@@ -203,34 +220,40 @@ describe("Faculty Consent Pages", () => {
       const rejectBtn = screen.getByRole("button", { name: /Reject Permission/i });
       fireEvent.click(rejectBtn);
 
-      expect(screen.getByText(/Please provide remarks explaining why the request was rejected/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Please provide remarks explaining why the request was rejected/i),
+      ).toBeInTheDocument();
       expect(submitSpy).not.toHaveBeenCalled();
     });
 
     it("renders read-only view when request is already decided", async () => {
       vi.spyOn(apiClient, "fetchFacultyPermissionDetail").mockResolvedValueOnce({
         id: "perm-123",
-        courseId: "course-101",
-        courseTitle: "Cloud Computing Systems",
-        studentId: "student-99",
-        studentName: "Neha Reddy",
-        contentType: "LAB_MANUAL",
-        expectedFormat: "pdf",
+        student_id: "student-99",
+        faculty_id: "fac-1",
+        title: "Permission request",
+        content_type: "LAB_MANUAL",
+        format: "pdf",
         description: "Hands-on Docker lab guide",
+        consent_declared: true,
+        consent_declared_at: "2026-11-24T08:00:00Z",
         status: "REJECTED",
         remarks: "Needs citations and verified references.",
-        createdAt: "2026-11-24T08:00:00Z",
-        decidedAt: "2026-11-24T08:30:00Z",
+        created_at: "2026-11-24T08:00:00Z",
+        decision_timestamp: "2026-11-24T08:30:00Z",
+        updated_at: "2026-11-24T08:30:00Z",
       });
 
       const { Route } = await import("@/routes/faculty.consent.$id");
-      const Component = Route.component;
+      const Component = (Route as unknown as { component: ComponentType }).component;
 
       render(<Component />);
 
       await waitFor(() => {
         expect(screen.getByText("Needs citations and verified references.")).toBeInTheDocument();
-        expect(screen.getByText(/This upload permission request has already been finalized/i)).toBeInTheDocument();
+        expect(
+          screen.getByText(/This upload permission request has already been finalized/i),
+        ).toBeInTheDocument();
       });
 
       expect(screen.queryByRole("button", { name: /Approve Permission/i })).not.toBeInTheDocument();
@@ -238,4 +261,3 @@ describe("Faculty Consent Pages", () => {
     });
   });
 });
-

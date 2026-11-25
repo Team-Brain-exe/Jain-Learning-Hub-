@@ -1,20 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import {
-  fetchFacultyAssignedPermissions,
-  type FacultyUploadPermissionItem,
-} from "@/lib/api-client";
-import {
-  Empty,
-  PageHeader,
-  RequireRole,
-  StatusBadge,
-  btn,
-  btnOutline,
-  fmtDate,
-  fmtDateTime,
-} from "@/components/studio/ui";
-import { FileCheck, Filter, RefreshCw, AlertCircle, ArrowRight } from "lucide-react";
+import { fetchFacultyAssignedPermissions, type UploadPermissionResponse } from "@/lib/api-client";
+import { UploadPermissionBadge } from "@/components/consent/UploadPermissionBadge";
+import { Empty, PageHeader, RequireRole, btn, btnOutline, fmtDate } from "@/components/studio/ui";
+import { RefreshCw, AlertCircle, ArrowRight } from "lucide-react";
+
+const toBadgeStatus = (s: UploadPermissionResponse["status"]) =>
+  s === "APPROVED" ? "approved" : s === "REJECTED" ? "rejected" : "pending";
 
 export const Route = createFileRoute("/faculty/consents")({
   component: FacultyConsentsPage,
@@ -31,7 +23,7 @@ function FacultyConsentsPage() {
 }
 
 function FacultyConsentsContent() {
-  const [permissions, setPermissions] = useState<FacultyUploadPermissionItem[]>([]);
+  const [permissions, setPermissions] = useState<UploadPermissionResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
@@ -46,7 +38,7 @@ function FacultyConsentsContent() {
       setError(
         err instanceof Error
           ? err.message
-          : "Failed to load assigned upload permissions. Please verify your connection."
+          : "Failed to load assigned upload permissions. Please verify your connection.",
       );
     } finally {
       setLoading(false);
@@ -76,8 +68,8 @@ function FacultyConsentsContent() {
     <div className="mx-auto max-w-6xl space-y-6 p-6">
       <PageHeader
         title="Faculty Upload Permissions & Consent"
-        description="Review student upload permission requests assigned to you. Inspect content details, course association, and approve or reject with remarks."
-        action={
+        subtitle="Review student upload permission requests assigned to you. Inspect content details, course association, and approve or reject with remarks."
+        actions={
           <button
             onClick={loadData}
             disabled={loading}
@@ -155,12 +147,11 @@ function FacultyConsentsContent() {
               ? "No assigned permission requests"
               : `No ${activeTab.toLowerCase()} requests`
           }
-          description={
+          body={
             activeTab === "ALL"
               ? "You do not have any student upload permissions assigned to you at this time."
               : `There are currently no permission requests with ${activeTab.toLowerCase()} status.`
           }
-          icon={FileCheck}
         />
       )}
 
@@ -175,35 +166,27 @@ function FacultyConsentsContent() {
               <div className="space-y-1.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-base font-semibold text-foreground">
-                    {item.courseTitle || item.title || "Untitled Permission Request"}
+                    {item.title || "Untitled Permission Request"}
                   </h3>
-                  <StatusBadge status={item.status} />
+                  <UploadPermissionBadge status={toBadgeStatus(item.status)} />
                   <span className="rounded bg-muted px-2 py-0.5 text-[11px] font-mono text-muted-foreground uppercase">
-                    {item.contentType || item.materialType || "MATERIAL"}
+                    {item.content_type || "MATERIAL"}
                   </span>
-                  {item.expectedFormat && (
+                  {item.format && (
                     <span className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground uppercase">
-                      {item.expectedFormat}
+                      {item.format}
                     </span>
                   )}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <span>
-                    Student: <strong className="text-foreground">{item.studentName || item.studentId || item.userId || "Unknown"}</strong>
+                    Student:{" "}
+                    <strong className="text-foreground">{item.student_id || "Unknown"}</strong>
                   </span>
-                  {item.courseId && (
-                    <span>
-                      Course ID: <code className="text-[11px] font-mono">{item.courseId}</code>
-                    </span>
-                  )}
-                  <span>
-                    Requested: {item.createdAt ? fmtDate(item.createdAt) : "N/A"}
-                  </span>
-                  {item.decidedAt && (
-                    <span>
-                      Decided: {fmtDate(item.decidedAt)}
-                    </span>
+                  <span>Requested: {item.created_at ? fmtDate(item.created_at) : "N/A"}</span>
+                  {item.decision_timestamp && (
+                    <span>Decided: {fmtDate(item.decision_timestamp)}</span>
                   )}
                 </div>
 
@@ -231,4 +214,3 @@ function FacultyConsentsContent() {
     </div>
   );
 }
-
