@@ -60,15 +60,19 @@ class AIReviewService:
             pipeline = AIReviewPipeline()
 
             asset_descriptors: List[Dict[str, Any]] = []
+            storage_base = os.getenv("STORAGE_BASE_PATH", "./storage")
             for asset in assets:
                 # Storage service key or actual disk path
                 file_path = asset.storage_key or ""
                 if not os.path.isabs(file_path):
-                    # Check in uploads or static folders if present
+                    # Check in uploads, storage base, or demo assets if present
                     candidates = [
                         os.path.join(os.getcwd(), file_path),
                         os.path.join(os.getcwd(), "backend", file_path),
                         os.path.join(os.getcwd(), "public", file_path),
+                        os.path.join(storage_base, file_path),
+                        os.path.join(os.getcwd(), "backend", "demo_assets", os.path.basename(file_path)),
+                        os.path.join(os.getcwd(), "demo_assets", os.path.basename(file_path)),
                     ]
                     for cand in candidates:
                         if os.path.exists(cand):

@@ -245,3 +245,60 @@ def test_faculty_email_incomplete_configuration(monkeypatch, missing_var):
     assert result["review_url"] == (
         "http://localhost:5173/faculty/consent/req_missing_cfg"
     )
+
+
+def test_faculty_email_with_port_8080_origin(monkeypatch):
+    """Test frontend base URL configured to local port 8080."""
+    monkeypatch.setenv("SMTP_USERNAME", "sender@example.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "test-password")
+    monkeypatch.setenv("SMTP_FROM_EMAIL", "sender@example.com")
+    monkeypatch.setenv("FRONTEND_BASE_URL", "http://localhost:8080")
+
+    smtp = MagicMock()
+    smtp.__enter__.return_value = smtp
+
+    with patch(
+        "app.services.notification_service.smtplib.SMTP",
+        return_value=smtp,
+    ):
+        result = EmailNotificationService.send_faculty_upload_request_notification(
+            faculty_email="faculty@jain.ac.in",
+            faculty_name="Dr. Rao",
+            student_name="Student",
+            request_id="req_8080_test",
+            title="AI Ethics",
+            content_type="academic",
+            description="Course syllabus",
+        )
+
+    assert result["status"] == "SENT"
+    assert result["review_url"] == "http://localhost:8080/faculty/consent/req_8080_test"
+
+
+def test_faculty_email_default_frontend_base_url_port_8080(monkeypatch):
+    """When FRONTEND_BASE_URL is not set, it safely defaults to http://localhost:8080."""
+    monkeypatch.setenv("SMTP_USERNAME", "sender@example.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "test-password")
+    monkeypatch.setenv("SMTP_FROM_EMAIL", "sender@example.com")
+    monkeypatch.delenv("FRONTEND_BASE_URL", raising=False)
+
+    smtp = MagicMock()
+    smtp.__enter__.return_value = smtp
+
+    with patch(
+        "app.services.notification_service.smtplib.SMTP",
+        return_value=smtp,
+    ):
+        result = EmailNotificationService.send_faculty_upload_request_notification(
+            faculty_email="faculty@jain.ac.in",
+            faculty_name="Dr. Rao",
+            student_name="Student",
+            request_id="req_default_port",
+            title="AI Ethics",
+            content_type="academic",
+            description="Course syllabus",
+        )
+
+    assert result["status"] == "SENT"
+    assert result["review_url"] == "http://localhost:8080/faculty/consent/req_default_port"
+

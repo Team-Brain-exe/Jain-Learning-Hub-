@@ -26,7 +26,7 @@ class EmailNotificationService:
     ) -> Dict[str, Any]:
         raw_frontend_url = os.getenv("FRONTEND_BASE_URL")
         frontend_url = (
-            raw_frontend_url if raw_frontend_url is not None else "http://localhost:5173"
+            raw_frontend_url if raw_frontend_url is not None else "http://localhost:8080"
         ).strip().rstrip("/")
         review_url = (
             f"{frontend_url}/faculty/consent/"
