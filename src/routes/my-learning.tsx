@@ -1,17 +1,37 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BookOpen, CheckCircle2, Clock, PlayCircle, Trophy } from "lucide-react";
+import {
+  Award,
+  BookOpen,
+  CheckCircle2,
+  Compass,
+  GraduationCap,
+  PlayCircle,
+  Sparkles,
+} from "lucide-react";
 import { courseProgress, flattenLessons, resumeLessonId, type Course } from "@/data/courses";
 import { useLearner } from "@/hooks/use-enrollment";
 import { useAllCourses } from "@/data/platform";
 import { useAuth } from "@/hooks/use-auth";
+import { findNextMilestone } from "@/data/learning";
+import { LearningWelcome } from "@/components/learning/LearningWelcome";
+import { LearningStats } from "@/components/learning/LearningStats";
+import { ContinueLearningCard } from "@/components/learning/ContinueLearningCard";
+import { LearningActivityPanel } from "@/components/learning/LearningActivityPanel";
+import { LearningGoalsPanel } from "@/components/learning/LearningGoalsPanel";
 
 export const Route = createFileRoute("/my-learning")({
   head: () => ({
     meta: [
       { title: "My Learning — JAIN FET Learning Hub" },
-      { name: "description", content: "Your enrolled courses, progress and recently accessed lessons." },
+      {
+        name: "description",
+        content: "Your enrolled courses, progress, personal goals and recently accessed lessons.",
+      },
       { property: "og:title", content: "My Learning — JAIN FET Learning Hub" },
-      { property: "og:description", content: "Your enrolled courses, progress and recently accessed lessons." },
+      {
+        property: "og:description",
+        content: "Your enrolled courses, progress, personal goals and recently accessed lessons.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -19,124 +39,317 @@ export const Route = createFileRoute("/my-learning")({
   component: MyLearning,
 });
 
-function Bar({ percent }: { percent: number }) {
-  return <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${percent}%` }} /></div>;
+function ProgressBar({ percent }: { percent: number }) {
+  return (
+    <div
+      className="h-2 flex-1 overflow-hidden rounded-full bg-muted"
+      role="progressbar"
+      aria-valuenow={percent}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={`Progress: ${percent}%`}
+    >
+      <div
+        className="h-full rounded-full bg-primary transition-all duration-300"
+        style={{ width: `${percent}%` }}
+      />
+    </div>
+  );
 }
 
 function MyLearning() {
   const s = useLearner();
   const courses = useAllCourses();
   const { user } = useAuth();
+
+  // Derive existing data structures
   const enrolled = courses.filter((c) => s.enrolled.includes(c.slug));
-  const withP = enrolled.map((c) => ({ c, p: courseProgress(c, s.completed[c.slug]), resume: resumeLessonId(c, s.last[c.slug], s.completed[c.slug]) }));
+  const withP = enrolled.map((c) => ({
+    c,
+    p: courseProgress(c, s.completed[c.slug]),
+    resume: resumeLessonId(c, s.last[c.slug], s.completed[c.slug]),
+  }));
+
   const inProgress = withP.filter((x) => x.p.percent < 100);
   const done = withP.filter((x) => x.p.percent === 100);
-  const recent = [...withP].filter((x) => s.last[x.c.slug]).sort((a, b) => (s.accessed[b.c.slug] ?? 0) - (s.accessed[a.c.slug] ?? 0));
-  const top = recent[0];
+
+  // Recent activity ordered by accessed timestamp
+  const recent = [...withP]
+    .filter((x) => s.last[x.c.slug])
+    .sort((a, b) => (s.accessed[b.c.slug] ?? 0) - (s.accessed[a.c.slug] ?? 0));
+
+  // Top course to resume (prioritize active in-progress course with recent activity)
+  const top =
+    inProgress.length > 0 ? (recent.find((r) => r.p.percent < 100) ?? inProgress[0]) : recent[0];
+
   const lessonsDone = withP.reduce((n, x) => n + x.p.done, 0);
-  const lessonTitle = (c: Course, id: string) => flattenLessons(c).find((l) => l.id === id)?.title;
+
+  const getLessonName = (c: Course, id: string) =>
+    flattenLessons(c).find((l) => l.id === id)?.title;
+
+  const nextMilestone = findNextMilestone(withP.map((x) => ({ course: x.c, progress: x.p })));
+
+  const recentActivityItems = recent.map(({ c, p }) => ({
+    course: c,
+    lessonId: s.last[c.slug]!,
+    lessonTitle: getLessonName(c, s.last[c.slug]!) || `Lesson ${s.last[c.slug]}`,
+    progressPercent: p.percent,
+    timestamp: s.accessed[c.slug],
+  }));
 
   return (
-    <div>
-      <section className="border-b border-border bg-card">
-        <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-          <p className="text-sm font-semibold text-primary">My Learning</p>
-          <h1 className="mt-1 text-3xl font-extrabold tracking-tight">Welcome back, {user ? user.name.split(" ")[0] : "learner"}</h1>
-          <p className="mt-2 text-muted-foreground">Pick up where you left off. Progress is a demo saved on this device. <Link to="/certificates" className="font-semibold text-primary">View certificates</Link></p>
-          <div className="mt-6 grid grid-cols-3 gap-3 sm:max-w-lg">
-            {[[BookOpen, enrolled.length, "Enrolled"], [Clock, lessonsDone, "Lessons done"], [Trophy, done.length, "Completed"]].map(([I, n, l]) => {
-              const Icon = I as typeof BookOpen;
-              return <div key={l as string} className="rounded-lg border border-border bg-background p-3"><Icon className="h-4 w-4 text-primary" /><p className="mt-1 text-xl font-bold text-navy">{n as number}</p><p className="text-xs text-muted-foreground">{l as string}</p></div>;
-            })}
-          </div>
-        </div>
-      </section>
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+        {/* M-1: Welcome Header */}
+        <LearningWelcome
+          userName={user?.name}
+          topResumable={
+            top
+              ? {
+                  course: top.c,
+                  lessonId: top.resume,
+                  lessonTitle: getLessonName(top.c, top.resume),
+                }
+              : null
+          }
+          hasEnrollments={enrolled.length > 0}
+          completedCoursesCount={done.length}
+        />
 
-      <div className="mx-auto max-w-6xl space-y-12 px-4 py-10 sm:px-6">
+        {/* M-2: Statistics Strip */}
+        <LearningStats
+          enrolledCount={enrolled.length}
+          lessonsDoneCount={lessonsDone}
+          completedCount={done.length}
+          inProgressCount={inProgress.length}
+        />
+
+        {/* State A: Zero Enrollments Empty State */}
         {!enrolled.length ? (
-          <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center">
-            <BookOpen className="mx-auto h-10 w-10 text-primary" />
-            <p className="mt-4 text-lg font-semibold">You haven't enrolled in any courses yet</p>
-            <p className="mt-1 text-sm text-muted-foreground">Browse the catalog, open a course and click "Enroll in Course" to start learning.</p>
-            <div className="mt-6 flex justify-center gap-3">
-              <Link to="/courses" className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground">Explore Courses</Link>
-              <Link to="/courses/$slug" params={{ slug: "python-programming-fundamentals" }} className="inline-flex h-10 items-center rounded-md border border-primary px-5 text-sm font-semibold text-primary">Try Python Fundamentals</Link>
+          <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center sm:p-14 shadow-card">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <BookOpen className="h-7 w-7" />
+            </div>
+            <h2 className="mt-4 text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+              You haven't enrolled in any courses yet
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground leading-relaxed">
+              Explore the engineering catalogue, view course outcomes and syllabus, and enroll to
+              start tracking your modules and certificates here.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <Link
+                to="/courses"
+                className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <Compass className="h-4 w-4" />
+                Explore Courses
+              </Link>
+              <Link
+                to="/courses/$slug"
+                params={{ slug: "python-programming-fundamentals" }}
+                className="inline-flex h-11 items-center gap-2 rounded-lg border border-primary/30 bg-card px-5 text-sm font-semibold text-primary transition hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <Sparkles className="h-4 w-4" />
+                Try Python Fundamentals
+              </Link>
             </div>
           </div>
         ) : (
-          <>
+          <div className="space-y-8 sm:space-y-10">
+            {/* M-3: Spotlight Continue Learning Card (State B) */}
             {top && (
-              <section className="overflow-hidden rounded-xl border border-border bg-navy text-navy-foreground">
-                <div className="grid md:grid-cols-[280px_1fr]">
-                  <img src={top.c.thumbnail} alt="" className="hidden h-full w-full object-cover md:block" />
-                  <div className="p-6">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-navy-foreground/70">Continue where you left off</p>
-                    <p className="mt-1 text-xl font-bold">{top.c.title}</p>
-                    <p className="mt-1 text-sm text-navy-foreground/80">Next: {lessonTitle(top.c, top.resume)}</p>
-                    <div className="mt-4 flex items-center gap-3"><div className="h-2 flex-1 overflow-hidden rounded-full bg-navy-foreground/20"><div className="h-full rounded-full bg-gold" style={{ width: `${top.p.percent}%` }} /></div><span className="text-sm">{top.p.percent}%</span></div>
-                    <Link to="/learn/$slug/$lessonId" params={{ slug: top.c.slug, lessonId: top.resume }} className="mt-5 inline-flex h-10 items-center gap-2 rounded-md bg-primary-foreground px-5 text-sm font-semibold text-navy hover:bg-secondary">
-                      <PlayCircle className="h-4 w-4" /> Continue Learning
-                    </Link>
-                  </div>
-                </div>
-              </section>
+              <ContinueLearningCard
+                course={top.c}
+                resumeLessonId={top.resume}
+                nextLessonTitle={getLessonName(top.c, top.resume)}
+                progressPercent={top.p.percent}
+                completedLessonsCount={top.p.done}
+                totalLessonsCount={top.p.total}
+              />
             )}
 
-            <section>
-              <h2 className="text-xl font-bold">In progress</h2>
-              {inProgress.length ? (
-                <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                  {inProgress.map(({ c, p, resume }) => (
-                    <div key={c.slug} className="flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-card">
-                      <img src={c.thumbnail} alt="" loading="lazy" className="aspect-[16/9] w-full border-b border-border object-cover" />
-                      <div className="flex flex-1 flex-col p-5">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-primary">{c.category}</p>
-                        <Link to="/courses/$slug" params={{ slug: c.slug }} className="mt-1 font-bold leading-snug hover:text-primary">{c.title}</Link>
-                        <p className="mt-1 text-sm text-muted-foreground">{c.instructor.name}</p>
-                        <div className="mt-4 flex items-center gap-3"><Bar percent={p.percent} /><span className="text-sm font-semibold">{p.percent}%</span></div>
-                        <p className="mt-1 text-xs text-muted-foreground">{p.done} of {p.total} lessons complete</p>
-                        <Link to="/learn/$slug/$lessonId" params={{ slug: c.slug, lessonId: resume }} className="mt-5 inline-flex h-10 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:bg-primary/90">
-                          {p.done || s.last[c.slug] ? "Continue Learning" : "Start Course"}
-                        </Link>
-                      </div>
+            {/* Dashboard Content Grid */}
+            <div className="grid gap-8 lg:grid-cols-3">
+              {/* Main Column (2 of 3 columns on large screens) */}
+              <div className="space-y-8 lg:col-span-2">
+                {/* In Progress Courses (State B) */}
+                <section aria-labelledby="in-progress-heading">
+                  <div className="flex items-center justify-between pb-3 border-b border-border">
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="h-5 w-5 text-primary" />
+                      <h2
+                        id="in-progress-heading"
+                        className="text-lg font-bold tracking-tight text-foreground sm:text-xl"
+                      >
+                        In Progress Courses
+                      </h2>
                     </div>
-                  ))}
-                </div>
-              ) : <p className="mt-3 text-sm text-muted-foreground">Nothing in progress — great work!</p>}
-            </section>
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      {inProgress.length} {inProgress.length === 1 ? "course" : "courses"}
+                    </span>
+                  </div>
 
-            {recent.length > 0 && (
-              <section>
-                <h2 className="text-xl font-bold">Recently accessed</h2>
-                <ul className="mt-4 divide-y divide-border rounded-xl border border-border bg-card">
-                  {recent.slice(0, 4).map(({ c, p }) => (
-                    <li key={c.slug}>
-                      <Link to="/learn/$slug/$lessonId" params={{ slug: c.slug, lessonId: s.last[c.slug]! }} className="flex items-center gap-4 p-4 transition hover:bg-muted">
-                        <PlayCircle className="h-5 w-5 shrink-0 text-primary" />
-                        <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{lessonTitle(c, s.last[c.slug]!)}</p><p className="truncate text-xs text-muted-foreground">{c.title}</p></div>
-                        <span className="text-sm text-muted-foreground">{p.percent}%</span>
+                  {inProgress.length > 0 ? (
+                    <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                      {inProgress.map(({ c, p, resume }) => (
+                        <div
+                          key={c.slug}
+                          className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-card transition-all hover:shadow-hover"
+                        >
+                          <div className="relative aspect-[16/9] w-full overflow-hidden bg-muted">
+                            <img
+                              src={c.thumbnail}
+                              alt=""
+                              loading="lazy"
+                              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            />
+                            <div className="absolute top-2.5 left-2.5">
+                              <span className="rounded-md bg-background/90 px-2 py-0.5 text-[11px] font-semibold text-primary backdrop-blur-xs">
+                                {c.category}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-1 flex-col p-5">
+                            <Link
+                              to="/courses/$slug"
+                              params={{ slug: c.slug }}
+                              className="font-bold leading-snug text-foreground hover:text-primary transition-colors line-clamp-1"
+                            >
+                              {c.title}
+                            </Link>
+                            <p className="mt-1 text-xs text-muted-foreground line-clamp-1">
+                              {c.instructor.name}
+                            </p>
+
+                            <div className="mt-4 space-y-1.5">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground">Progress</span>
+                                <span className="font-bold text-foreground">{p.percent}%</span>
+                              </div>
+                              <ProgressBar percent={p.percent} />
+                              <p className="text-[11px] text-muted-foreground">
+                                {p.done} of {p.total} lessons complete
+                              </p>
+                            </div>
+
+                            <div className="mt-5 pt-3 border-t border-border/70">
+                              <Link
+                                to="/learn/$slug/$lessonId"
+                                params={{ slug: c.slug, lessonId: resume }}
+                                className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-xs transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                              >
+                                <PlayCircle className="h-3.5 w-3.5" />
+                                {p.done || s.last[c.slug] ? "Continue Learning" : "Start Course"}
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-xl border border-dashed border-border bg-card p-6 text-center">
+                      <CheckCircle2 className="mx-auto h-8 w-8 text-success" />
+                      <p className="mt-2 text-sm font-semibold text-foreground">
+                        All enrolled courses are completed!
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Great job! Browse the catalog to start a new course.
+                      </p>
+                      <Link
+                        to="/courses"
+                        className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-xs font-semibold text-primary-foreground"
+                      >
+                        Explore Catalog
                       </Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
+                    </div>
+                  )}
+                </section>
 
-            <section>
-              <h2 className="text-xl font-bold">Completed</h2>
-              {done.length ? (
-                <ul className="mt-4 grid gap-4 sm:grid-cols-2">
-                  {done.map(({ c }) => (
-                    <li key={c.slug} className="flex items-center gap-4 rounded-xl border border-border bg-card p-4">
-                      <CheckCircle2 className="h-6 w-6 shrink-0 text-success" />
-                      <div className="flex-1"><p className="font-semibold">{c.title}</p><p className="text-xs text-muted-foreground">All lessons complete</p></div>
-                      <Link to="/learn/$slug/$lessonId" params={{ slug: c.slug, lessonId: "1-1" }} className="text-sm font-semibold text-primary">Review</Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : <p className="mt-3 text-sm text-muted-foreground">Finish every lesson in a course and it will appear here.</p>}
-            </section>
-          </>
+                {/* Completed Courses Section (State C) */}
+                <section aria-labelledby="completed-heading">
+                  <div className="flex items-center justify-between pb-3 border-b border-border">
+                    <div className="flex items-center gap-2">
+                      <Award className="h-5 w-5 text-gold" />
+                      <h2
+                        id="completed-heading"
+                        className="text-lg font-bold tracking-tight text-foreground sm:text-xl"
+                      >
+                        Completed Courses
+                      </h2>
+                    </div>
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      {done.length} {done.length === 1 ? "course" : "courses"}
+                    </span>
+                  </div>
+
+                  {done.length > 0 ? (
+                    <ul className="mt-4 grid gap-4 sm:grid-cols-2" role="list">
+                      {done.map(({ c }) => (
+                        <li
+                          key={c.slug}
+                          className="flex flex-col justify-between rounded-xl border border-border bg-card p-4 shadow-card sm:p-5"
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-success/15 text-success">
+                              <CheckCircle2 className="h-5 w-5" />
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="font-bold text-sm text-foreground line-clamp-1">
+                                {c.title}
+                              </h3>
+                              <p className="text-xs text-muted-foreground">{c.instructor.name}</p>
+                              <span className="mt-1 inline-block text-[11px] font-semibold text-success">
+                                100% Completed • All lessons finished
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 flex items-center justify-end gap-2 pt-3 border-t border-border/70 text-xs font-semibold">
+                            <Link
+                              to="/learn/$slug/$lessonId"
+                              params={{ slug: c.slug, lessonId: "1-1" }}
+                              className="inline-flex h-8 items-center rounded-md border border-border bg-background px-3 text-foreground hover:bg-muted"
+                            >
+                              Review
+                            </Link>
+                            <Link
+                              to="/certificates"
+                              className="inline-flex h-8 items-center gap-1 rounded-md bg-secondary px-3 text-primary hover:bg-secondary/80"
+                            >
+                              <Award className="h-3.5 w-3.5 text-gold" />
+                              Certificate
+                            </Link>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="mt-4 rounded-xl border border-dashed border-border bg-card p-6 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        Finish every lesson in a course and your verified completion and certificate
+                        link will appear here.
+                      </p>
+                    </div>
+                  )}
+                </section>
+              </div>
+
+              {/* Sidebar Column (1 of 3 columns on large screens) */}
+              <div className="space-y-8">
+                {/* M-5: Learning Goals Panel */}
+                <LearningGoalsPanel
+                  totalLessonsDone={lessonsDone}
+                  completedCoursesCount={done.length}
+                  nextMilestone={nextMilestone}
+                />
+
+                {/* M-4: Learning Activity Panel (State D) */}
+                <LearningActivityPanel items={recentActivityItems} />
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
