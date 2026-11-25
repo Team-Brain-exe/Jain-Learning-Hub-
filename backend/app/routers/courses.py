@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.database import get_db
-from app.models.course import Course, Module, Lesson, CourseLifecycleStatus
+from app.models.course import Course, Module, Lesson, MediaAsset, CourseLifecycleStatus, UploadSessionStatus
 from app.schemas.course import (
     CourseCreateRequest,
     CourseUpdateRequest,
@@ -84,6 +84,23 @@ def create_course(
             order_index=m_data.order_index or m_idx
         )
         for l_idx, l_data in enumerate(m_data.lessons):
+            if l_data.media_asset_id:
+                asset = db.query(MediaAsset).filter(MediaAsset.id == l_data.media_asset_id).first()
+                if not asset:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Referenced media asset '{l_data.media_asset_id}' not found."
+                    )
+                if asset.uploader_id != user.id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Access denied: You cannot attach another user's media asset."
+                    )
+                if asset.upload_status != UploadSessionStatus.FINALIZED:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Referenced media asset must be finalized before attaching to a course."
+                    )
             lesson = Lesson(
                 title=l_data.title,
                 content=l_data.content,
@@ -180,6 +197,13 @@ def submit_course_for_review(
             detail=f"Cannot submit course currently in '{course.status}' state."
         )
 
+    # Re-verify that the underlying upload permission is still approved
+    verify_approved_upload_permission(
+        db=db,
+        student_id=user.id,
+        permission_id=course.permission_id
+    )
+
     # 1. Transition to SUBMITTED -> AI_PROCESSING
     course.status = CourseLifecycleStatus.SUBMITTED
     db.commit()
@@ -255,8 +279,21 @@ def submit_faculty_publication_decision(
     if course.faculty_reviewer_id != user.id and user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: You are not authorized to make a publication decision on this course.")
 
+    if course.status not in [CourseLifecycleStatus.FACULTY_REVIEW, CourseLifecycleStatus.SUBMITTED]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot submit faculty decision when course is in '{course.status}' state."
+        )
+
     decision_clean = payload.decision.upper().strip()
     if decision_clean == "APPROVE":
+        from app.models.ai_review import AIJobStatus
+        latest_job = db.query(AIReviewJob).filter(AIReviewJob.course_id == course.id).order_by(AIReviewJob.created_at.desc()).first()
+        if latest_job and latest_job.status in [AIJobStatus.QUEUED, AIJobStatus.PROCESSING, AIJobStatus.EXTRACTING, AIJobStatus.VERIFYING]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot approve course while AI verification job is still in progress."
+            )
         course.status = CourseLifecycleStatus.PUBLISHED
     elif decision_clean == "REJECT":
         course.status = CourseLifecycleStatus.REJECTED
