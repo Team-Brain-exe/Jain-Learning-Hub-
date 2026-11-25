@@ -15,6 +15,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as BecomeACreatorRouteImport } from './routes/become-a-creator'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MyLearningRouteImport } from './routes/my-learning'
+import { Route as MyPermissionsRouteImport } from './routes/my-permissions'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as CertificatesIndexRouteImport } from './routes/certificates.index'
@@ -59,6 +60,11 @@ const LoginRoute = LoginRouteImport.update({
 const MyLearningRoute = MyLearningRouteImport.update({
   id: '/my-learning',
   path: '/my-learning',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyPermissionsRoute = MyPermissionsRouteImport.update({
+  id: '/my-permissions',
+  path: '/my-permissions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileRoute = ProfileRouteImport.update({
@@ -144,6 +150,7 @@ export interface FileRoutesByFullPath {
   '/become-a-creator': typeof BecomeACreatorRoute
   '/login': typeof LoginRoute
   '/my-learning': typeof MyLearningRoute
+  '/my-permissions': typeof MyPermissionsRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/certificates/$certId': typeof CertificatesCertIdRoute
@@ -167,6 +174,7 @@ export interface FileRoutesByTo {
   '/become-a-creator': typeof BecomeACreatorRoute
   '/login': typeof LoginRoute
   '/my-learning': typeof MyLearningRoute
+  '/my-permissions': typeof MyPermissionsRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/certificates/$certId': typeof CertificatesCertIdRoute
@@ -191,6 +199,7 @@ export interface FileRoutesById {
   '/become-a-creator': typeof BecomeACreatorRoute
   '/login': typeof LoginRoute
   '/my-learning': typeof MyLearningRoute
+  '/my-permissions': typeof MyPermissionsRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/certificates/$certId': typeof CertificatesCertIdRoute
@@ -216,6 +225,7 @@ export interface FileRouteTypes {
     | '/become-a-creator'
     | '/login'
     | '/my-learning'
+    | '/my-permissions'
     | '/profile'
     | '/register'
     | '/certificates/$certId'
@@ -239,6 +249,7 @@ export interface FileRouteTypes {
     | '/become-a-creator'
     | '/login'
     | '/my-learning'
+    | '/my-permissions'
     | '/profile'
     | '/register'
     | '/certificates/$certId'
@@ -262,6 +273,7 @@ export interface FileRouteTypes {
     | '/become-a-creator'
     | '/login'
     | '/my-learning'
+    | '/my-permissions'
     | '/profile'
     | '/register'
     | '/certificates/$certId'
@@ -286,6 +298,7 @@ export interface RootRouteChildren {
   BecomeACreatorRoute: typeof BecomeACreatorRoute
   LoginRoute: typeof LoginRoute
   MyLearningRoute: typeof MyLearningRoute
+  MyPermissionsRoute: typeof MyPermissionsRoute
   ProfileRoute: typeof ProfileRoute
   RegisterRoute: typeof RegisterRoute
   CertificatesCertIdRoute: typeof CertificatesCertIdRoute
@@ -345,6 +358,13 @@ declare module '@tanstack/react-router' {
       path: '/my-learning'
       fullPath: '/my-learning'
       preLoaderRoute: typeof MyLearningRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-permissions': {
+      id: '/my-permissions'
+      path: '/my-permissions'
+      fullPath: '/my-permissions'
+      preLoaderRoute: typeof MyPermissionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile': {
@@ -462,6 +482,7 @@ const rootRouteChildren: RootRouteChildren = {
   BecomeACreatorRoute: BecomeACreatorRoute,
   LoginRoute: LoginRoute,
   MyLearningRoute: MyLearningRoute,
+  MyPermissionsRoute: MyPermissionsRoute,
   ProfileRoute: ProfileRoute,
   RegisterRoute: RegisterRoute,
   CertificatesCertIdRoute: CertificatesCertIdRoute,
