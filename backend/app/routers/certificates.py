@@ -117,6 +117,19 @@ def verify_certificate_eligibility(
                 detail=f"Ineligible: Peer educator certificates are restricted to student creators (recipient role is '{recipient_user.role}')."
             )
 
+        # Verify course was backed by an approved upload permission for the creator
+        from app.models.upload_permission import UploadPermission, PermissionStatus
+        perm = db.query(UploadPermission).filter(
+            UploadPermission.id == course.permission_id,
+            UploadPermission.student_id == recipient_id,
+            UploadPermission.status == PermissionStatus.APPROVED,
+        ).first()
+        if not perm:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ineligible: Course does not have an approved faculty upload permission for the creator."
+            )
+
     # Final safeguard: recipient must be a real student account.
     recipient_user = db.query(User).filter(User.id == recipient_id).first()
     if recipient_user is None or recipient_user.role != "student":
