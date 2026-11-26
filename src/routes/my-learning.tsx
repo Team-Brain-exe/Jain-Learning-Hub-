@@ -12,7 +12,7 @@ import { courseProgress, flattenLessons, resumeLessonId, type Course } from "@/d
 import { useLearner } from "@/hooks/use-enrollment";
 import { useAllCourses } from "@/data/platform";
 import { useAuth } from "@/hooks/use-auth";
-import { findNextMilestone } from "@/data/learning";
+import { countLessonsCompletedThisWeek, findNextMilestone } from "@/data/learning";
 import { LearningWelcome } from "@/components/learning/LearningWelcome";
 import { LearningStats } from "@/components/learning/LearningStats";
 import { ContinueLearningCard } from "@/components/learning/ContinueLearningCard";
@@ -27,7 +27,10 @@ export const Route = createFileRoute("/my-learning")({
         name: "description",
         content: "Your enrolled courses, progress, personal goals and recently accessed lessons.",
       },
-      { property: "og:title", content: "My Learning — JAIN FET Learning Hub" },
+      {
+        property: "og:title",
+        content: "My Learning — JAIN FET Learning Hub",
+      },
       {
         property: "og:description",
         content: "Your enrolled courses, progress, personal goals and recently accessed lessons.",
@@ -62,37 +65,50 @@ function MyLearning() {
   const courses = useAllCourses();
   const { user } = useAuth();
 
-  // Derive existing data structures safely
+  // Derive existing data structures safely.
   const enrolledList = Array.isArray(s.enrolled) ? s.enrolled : [];
   const completedMap = s.completed ?? {};
+  const completedAtMap = s.completedAt ?? {};
   const lastMap = s.last ?? {};
   const accessedMap = s.accessed ?? {};
 
-  const enrolled = courses.filter((c) => enrolledList.includes(c.slug));
-  const withP = enrolled.map((c) => ({
-    c,
-    p: courseProgress(c, completedMap[c.slug]),
-    resume: resumeLessonId(c, lastMap[c.slug], completedMap[c.slug]),
+  const enrolled = courses.filter((course) => enrolledList.includes(course.slug));
+
+  const withP = enrolled.map((course) => ({
+    c: course,
+    p: courseProgress(course, completedMap[course.slug]),
+    resume: resumeLessonId(course, lastMap[course.slug], completedMap[course.slug]),
   }));
 
-  const inProgress = withP.filter((x) => x.p.percent < 100);
-  const done = withP.filter((x) => x.p.percent === 100);
+  const inProgress = withP.filter((item) => item.p.percent < 100);
+  const done = withP.filter((item) => item.p.percent === 100);
 
-  // Recent activity ordered by accessed timestamp
+  // Recent activity ordered by accessed timestamp.
   const recent = [...withP]
-    .filter((x) => Boolean(lastMap[x.c.slug]))
+    .filter((item) => Boolean(lastMap[item.c.slug]))
     .sort((a, b) => (accessedMap[b.c.slug] ?? 0) - (accessedMap[a.c.slug] ?? 0));
 
-  // Top course to resume (only spotlight in-progress courses; never show completed courses as in-progress)
+  // Top course to resume (only spotlight in-progress courses).
   const top =
-    inProgress.length > 0 ? (recent.find((r) => r.p.percent < 100) ?? inProgress[0]) : undefined;
+    inProgress.length > 0
+      ? (recent.find((item) => item.p.percent < 100) ?? inProgress[0])
+      : undefined;
 
-  const lessonsDone = withP.reduce((n, x) => n + x.p.done, 0);
+  // Lifetime count remains unchanged for the statistics strip.
+  const lessonsDone = withP.reduce((count, item) => count + item.p.done, 0);
 
-  const getLessonName = (c: Course, id: string) =>
-    flattenLessons(c).find((l) => l.id === id)?.title;
+  // Separate count for the personal weekly goal.
+  const weeklyLessonsDone = countLessonsCompletedThisWeek(completedAtMap);
 
-  const nextMilestone = findNextMilestone(withP.map((x) => ({ course: x.c, progress: x.p })));
+  const getLessonName = (course: Course, id: string) =>
+    flattenLessons(course).find((lesson) => lesson.id === id)?.title;
+
+  const nextMilestone = findNextMilestone(
+    withP.map((item) => ({
+      course: item.c,
+      progress: item.p,
+    })),
+  );
 
   const recentActivityItems = recent.map(({ c, p }) => ({
     course: c,
@@ -135,13 +151,16 @@ function MyLearning() {
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
               <BookOpen className="h-7 w-7" />
             </div>
+
             <h2 className="mt-4 text-xl font-bold tracking-tight text-foreground sm:text-2xl">
               You haven't enrolled in any courses yet
             </h2>
+
             <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground leading-relaxed">
               Explore the engineering catalogue, view course outcomes and syllabus, and enroll to
               start tracking your modules and certificates here.
             </p>
+
             <div className="mt-6 flex flex-wrap justify-center gap-3">
               <Link
                 to="/courses"
@@ -150,6 +169,7 @@ function MyLearning() {
                 <Compass className="h-4 w-4" />
                 Explore Courses
               </Link>
+
               <Link
                 to="/courses/$slug"
                 params={{ slug: "python-programming-fundamentals" }}
@@ -176,7 +196,7 @@ function MyLearning() {
 
             {/* Dashboard Content Grid */}
             <div className="grid gap-8 lg:grid-cols-3">
-              {/* Main Column (2 of 3 columns on large screens) */}
+              {/* Main Column */}
               <div className="min-w-0 space-y-8 lg:col-span-2">
                 {/* In Progress Courses (State B) */}
                 <section aria-labelledby="in-progress-heading">
@@ -190,6 +210,7 @@ function MyLearning() {
                         In Progress Courses
                       </h2>
                     </div>
+
                     <span className="text-xs font-semibold text-muted-foreground">
                       {inProgress.length} {inProgress.length === 1 ? "course" : "courses"}
                     </span>
@@ -209,6 +230,7 @@ function MyLearning() {
                               loading="lazy"
                               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                             />
+
                             <div className="absolute top-2.5 left-2.5">
                               <span className="rounded-md bg-background/90 px-2 py-0.5 text-[11px] font-semibold text-primary backdrop-blur-xs">
                                 {c.category}
@@ -224,6 +246,7 @@ function MyLearning() {
                             >
                               {c.title}
                             </Link>
+
                             <p className="mt-1 text-xs text-muted-foreground line-clamp-1">
                               {c.instructor.name}
                             </p>
@@ -233,7 +256,9 @@ function MyLearning() {
                                 <span className="text-muted-foreground">Progress</span>
                                 <span className="font-bold text-foreground">{p.percent}%</span>
                               </div>
+
                               <ProgressBar percent={p.percent} />
+
                               <p className="text-[11px] text-muted-foreground">
                                 {p.done} of {p.total} lessons complete
                               </p>
@@ -242,7 +267,10 @@ function MyLearning() {
                             <div className="mt-5 pt-3 border-t border-border/70">
                               <Link
                                 to="/learn/$slug/$lessonId"
-                                params={{ slug: c.slug, lessonId: resume }}
+                                params={{
+                                  slug: c.slug,
+                                  lessonId: resume,
+                                }}
                                 className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-xs transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                               >
                                 <PlayCircle className="h-3.5 w-3.5" />
@@ -284,6 +312,7 @@ function MyLearning() {
                         Completed Courses
                       </h2>
                     </div>
+
                     <span className="text-xs font-semibold text-muted-foreground">
                       {done.length} {done.length === 1 ? "course" : "courses"}
                     </span>
@@ -300,11 +329,14 @@ function MyLearning() {
                             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-success/15 text-success">
                               <CheckCircle2 className="h-5 w-5" />
                             </span>
+
                             <div className="min-w-0 flex-1">
                               <h3 className="font-bold text-sm text-foreground line-clamp-1">
                                 {c.title}
                               </h3>
+
                               <p className="text-xs text-muted-foreground">{c.instructor.name}</p>
+
                               <span className="mt-1 inline-block text-[11px] font-semibold text-success">
                                 100% Completed • All lessons finished
                               </span>
@@ -314,11 +346,15 @@ function MyLearning() {
                           <div className="mt-4 flex items-center justify-end gap-2 pt-3 border-t border-border/70 text-xs font-semibold">
                             <Link
                               to="/learn/$slug/$lessonId"
-                              params={{ slug: c.slug, lessonId: "1-1" }}
+                              params={{
+                                slug: c.slug,
+                                lessonId: "1-1",
+                              }}
                               className="inline-flex h-9 items-center rounded-md border border-border bg-background px-3 text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                             >
                               Review
                             </Link>
+
                             <Link
                               to="/certificates"
                               className="inline-flex h-9 items-center gap-1 rounded-md bg-secondary px-3 text-primary hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -341,16 +377,16 @@ function MyLearning() {
                 </section>
               </div>
 
-              {/* Sidebar Column (1 of 3 columns on large screens) */}
+              {/* Sidebar Column */}
               <div className="min-w-0 space-y-8">
                 {/* M-5: Learning Goals Panel */}
                 <LearningGoalsPanel
-                  totalLessonsDone={lessonsDone}
+                  weeklyLessonsDone={weeklyLessonsDone}
                   completedCoursesCount={done.length}
                   nextMilestone={nextMilestone}
                 />
 
-                {/* M-4: Learning Activity Panel (State D) */}
+                {/* M-4: Learning Activity Panel */}
                 <LearningActivityPanel items={recentActivityItems} />
               </div>
             </div>
