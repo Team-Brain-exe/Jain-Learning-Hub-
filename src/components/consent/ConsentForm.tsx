@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { FieldError } from "@/components/consent/FieldError";
 import { btn, card, Field, input } from "@/components/studio/ui";
 import type { ContentFormat } from "@/data/upload-permissions";
+import type { FacultyDirectoryItem } from "@/lib/api-client";
 import {
   CONSENT_CATEGORIES,
   CONSENT_FORMATS,
@@ -23,38 +24,41 @@ const formatLabel: Record<ContentFormat, string> = {
 
 type FieldName = keyof ConsentFormValues;
 
-/**
- * Upload-permission consent form. Presentation + validation only: the parent decides what
- * happens on submit (e.g. `requestUploadPermission(user, values)` from `@/data/upload-permissions`).
- */
 export function ConsentForm({
   onSubmit,
-  defaultValues,
+  faculty,
+  facultyLoading = false,
 }: {
-  onSubmit: (values: ConsentFormValues) => void;
-  defaultValues?: Partial<ConsentFormValues>;
+  onSubmit: (values: ConsentFormValues) => void | Promise<void>;
+  faculty: FacultyDirectoryItem[];
+  facultyLoading?: boolean;
 }) {
   const uid = useId();
+
   const {
     register,
     handleSubmit,
     watch,
-    setValue,
     formState: { errors, isSubmitting },
   } = useForm<ConsentFormValues>({
     resolver: zodResolver(consentSchema),
-    // validate after the first blur, then live; never while the first character is being typed
     mode: "onTouched",
-    defaultValues: { consent: false, ...defaultValues },
+    defaultValues: {
+      consent: false,
+      title: "",
+      category: undefined,
+      format: undefined,
+      description: "",
+      facultyId: "",
+    },
   });
 
   const consent = watch("consent");
-  const proposalName = watch("proposalName");
 
-  /** id + aria wiring shared by every control */
   const a11y = (name: FieldName) => {
     const errorId = `${uid}-${name}-error`;
     const invalid = Boolean(errors[name]);
+
     return {
       id: `${uid}-${name}`,
       errorId,
@@ -69,11 +73,18 @@ export function ConsentForm({
   const category = a11y("category");
   const format = a11y("format");
   const description = a11y("description");
-  const facultyEmail = a11y("facultyEmail");
+  const facultyId = a11y("facultyId");
   const consentA = a11y("consent");
 
+  const canSubmit =
+    consent && !isSubmitting && !facultyLoading && faculty.length > 0;
+
   return (
-    <form noValidate onSubmit={handleSubmit(onSubmit)} className={`${card} space-y-5`}>
+    <form
+      noValidate
+      onSubmit={handleSubmit(onSubmit)}
+      className={`${card} space-y-5`}
+    >
       <div>
         <Field label="Content title">
           <input
@@ -100,15 +111,19 @@ export function ConsentForm({
               <option value="" disabled>
                 Select a category
               </option>
-              {CONSENT_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
+              {CONSENT_CATEGORIES.map((item) => (
+                <option key={item} value={item}>
+                  {item}
                 </option>
               ))}
             </select>
           </Field>
-          <FieldError id={category.errorId} message={errors.category?.message} />
+          <FieldError
+            id={category.errorId}
+            message={errors.category?.message}
+          />
         </div>
+
         <div>
           <Field label="Content format">
             <select
@@ -121,9 +136,9 @@ export function ConsentForm({
               <option value="" disabled>
                 Select a format
               </option>
-              {CONSENT_FORMATS.map((f) => (
-                <option key={f} value={f}>
-                  {formatLabel[f]}
+              {CONSENT_FORMATS.map((item) => (
+                <option key={item} value={item}>
+                  {formatLabel[item]}
                 </option>
               ))}
             </select>
@@ -133,7 +148,10 @@ export function ConsentForm({
       </div>
 
       <div>
-        <Field label="Description" hint="What is the content about, and who is it for?">
+        <Field
+          label="Description"
+          hint="What is the content about, and who is it for?"
+        >
           <textarea
             id={description.id}
             rows={4}
@@ -142,40 +160,44 @@ export function ConsentForm({
             {...register("description")}
           />
         </Field>
-        <FieldError id={description.errorId} message={errors.description?.message} />
-      </div>
-
-      <div>
-        <Field label="Faculty email" hint="The faculty member who will review this request.">
-          <input
-            id={facultyEmail.id}
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            className={input}
-            {...facultyEmail.props}
-            {...register("facultyEmail")}
-          />
-        </Field>
-        <FieldError id={facultyEmail.errorId} message={errors.facultyEmail?.message} />
+        <FieldError
+          id={description.errorId}
+          message={errors.description?.message}
+        />
       </div>
 
       <div>
         <Field
-          label="Supporting proposal (optional)"
-          hint="Only the file name is recorded in this demo."
+          label="Faculty reviewer"
+          hint="Choose an active faculty member to review this request."
         >
-          <input
-            type="file"
-            accept=".pdf,.doc,.docx,.ppt,.pptx"
-            className={`${input} file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1 file:text-sm file:font-semibold`}
-            onChange={(e) =>
-              setValue("proposalName", e.target.files?.[0]?.name ?? "", { shouldDirty: true })
-            }
-          />
+          <select
+            id={facultyId.id}
+            className={input}
+            defaultValue=""
+            disabled={facultyLoading || faculty.length === 0}
+            {...facultyId.props}
+            {...register("facultyId")}
+          >
+            <option value="" disabled>
+              {facultyLoading ? "Loading faculty..." : "Select a faculty member"}
+            </option>
+            {faculty.map((member) => (
+              <option key={member.id} value={member.id}>
+                {member.name} — {member.department}
+              </option>
+            ))}
+          </select>
         </Field>
-        {proposalName && (
-          <p className="mt-1 text-xs text-muted-foreground">Selected: {proposalName}</p>
+        <FieldError
+          id={facultyId.errorId}
+          message={errors.facultyId?.message}
+        />
+        {!facultyLoading && faculty.length === 0 && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            No active faculty members are currently available. Please try again
+            later.
+          </p>
         )}
       </div>
 
@@ -189,21 +211,26 @@ export function ConsentForm({
             {...register("consent")}
           />
           <label htmlFor={consentA.id} className="text-sm">
-            I confirm this content is my own (or I have the right to share it), and I consent to it
-            being reviewed by faculty and published on the JAIN FET Learning Hub if approved.
+            I confirm this content is my own (or I have the right to share it),
+            and I consent to it being reviewed by faculty and published on the
+            JAIN FET Learning Hub if approved.
           </label>
         </div>
-        <FieldError id={consentA.errorId} message={errors.consent?.message} />
+        <FieldError
+          id={consentA.errorId}
+          message={errors.consent?.message}
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
           className={`${btn} w-full sm:w-auto`}
-          disabled={!consent || isSubmitting}
+          disabled={!canSubmit}
         >
           Request upload permission
         </button>
+
         {!consent && (
           <p className="text-xs text-muted-foreground">
             Tick the declaration above to enable this button.

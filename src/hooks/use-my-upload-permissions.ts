@@ -25,14 +25,27 @@ function toViewStatus(status: UploadPermissionResponse["status"]): ViewStatus {
   return "pending";
 }
 
-export function useMyUploadPermissions() {
+export function useMyUploadPermissions(enabled = true) {
   const [items, setItems] = useState<MyPermissionView[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+
+    if (!enabled) {
+      setLoading(false);
+      setError(null);
+      setItems([]);
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setLoading(true);
+    setError(null);
 
     Promise.all([
       fetchMyUploadPermissions(),
@@ -40,23 +53,32 @@ export function useMyUploadPermissions() {
     ])
       .then(([permissions, faculty]) => {
         if (cancelled) return;
-        const names = new Map<string, string>(faculty.map((f): [string, string] => [f.id, f.name]));
+
+        const names = new Map<string, string>(
+          faculty.map((member): [string, string] => [
+            member.id,
+            member.name,
+          ]),
+        );
+
         setItems(
-          permissions.map((p) => ({
-            id: p.id,
-            title: p.title,
-            facultyId: p.faculty_id,
-            facultyName: names.get(p.faculty_id) ?? null,
-            status: toViewStatus(p.status),
-            createdAt: p.created_at,
-            decidedAt: p.decision_timestamp ?? null,
-            remarks: p.remarks ?? null,
+          permissions.map((permission) => ({
+            id: permission.id,
+            title: permission.title,
+            facultyId: permission.faculty_id,
+            facultyName: names.get(permission.faculty_id) ?? null,
+            status: toViewStatus(permission.status),
+            createdAt: permission.created_at,
+            decidedAt: permission.decision_timestamp ?? null,
+            remarks: permission.remarks ?? null,
           })),
         );
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Something went wrong.");
+          setError(
+            err instanceof Error ? err.message : "Something went wrong.",
+          );
         }
       })
       .finally(() => {
@@ -66,12 +88,12 @@ export function useMyUploadPermissions() {
     return () => {
       cancelled = true;
     };
-  }, [attempt]);
+  }, [attempt, enabled]);
 
   const retry = useCallback(() => {
     setError(null);
     setLoading(true);
-    setAttempt((n) => n + 1);
+    setAttempt((current) => current + 1);
   }, []);
 
   return { items, loading, error, retry };
