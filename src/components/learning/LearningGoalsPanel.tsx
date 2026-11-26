@@ -4,7 +4,8 @@ import { Award, Check, ChevronRight, Flag, Plus, Minus, Target } from "lucide-re
 import { getStoredLearnerGoal, setStoredLearnerGoal } from "@/data/learning";
 
 export interface LearningGoalsPanelProps {
-  totalLessonsDone: number;
+  weeklyLessonsDone?: number;
+  totalLessonsDone?: number;
   completedCoursesCount: number;
   nextMilestone: {
     courseTitle: string;
@@ -14,7 +15,7 @@ export interface LearningGoalsPanelProps {
 }
 
 export function LearningGoalsPanel({
-  totalLessonsDone,
+  weeklyLessonsDone = 0,
   completedCoursesCount,
   nextMilestone,
 }: LearningGoalsPanelProps) {
@@ -29,15 +30,20 @@ export function LearningGoalsPanel({
   }, []);
 
   const handleUpdateGoal = (newGoal: number) => {
-    const val = Math.max(1, Math.min(30, newGoal));
-    setGoal(val);
-    setStoredLearnerGoal(val);
+    const value = Math.max(1, Math.min(30, newGoal));
+
+    setGoal(value);
+    setStoredLearnerGoal(value);
     setSavedNotice(true);
+
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setSavedNotice(false), 2000);
+
+    timerRef.current = setTimeout(() => {
+      setSavedNotice(false);
+    }, 2000);
   };
 
-  const currentProgress = Math.min(totalLessonsDone, goal);
+  const currentProgress = Math.min(weeklyLessonsDone, goal);
   const goalPercent = Math.min(100, Math.round((currentProgress / goal) * 100));
 
   return (
@@ -52,6 +58,7 @@ export function LearningGoalsPanel({
             Personal Weekly Goal
           </h2>
         </div>
+
         {savedNotice && (
           <span className="inline-flex items-center gap-1 text-xs font-medium text-success animate-fade-in">
             <Check className="h-3 w-3" /> Saved locally
@@ -70,6 +77,7 @@ export function LearningGoalsPanel({
               / {goal} lessons target
             </span>
           </div>
+
           <span className="text-xs font-bold text-primary sm:text-sm">{goalPercent}%</span>
         </div>
 
@@ -90,6 +98,7 @@ export function LearningGoalsPanel({
         {/* Goal adjustment controls */}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-border/60">
           <span className="text-xs text-muted-foreground">Adjust weekly target:</span>
+
           <div className="flex flex-wrap items-center gap-1.5">
             {[3, 5, 8, 12].map((preset) => (
               <button
@@ -106,6 +115,7 @@ export function LearningGoalsPanel({
                 {preset}
               </button>
             ))}
+
             <div className="flex items-center ml-1 border border-border rounded">
               <button
                 type="button"
@@ -116,6 +126,7 @@ export function LearningGoalsPanel({
               >
                 <Minus className="h-3.5 w-3.5" />
               </button>
+
               <button
                 type="button"
                 onClick={() => handleUpdateGoal(goal + 1)}
@@ -147,11 +158,13 @@ export function LearningGoalsPanel({
             <p className="text-xs font-semibold text-primary truncate">
               {nextMilestone.courseTitle}
             </p>
+
             <p className="mt-1 text-xs text-muted-foreground">
               {nextMilestone.remainingLessons === 0
                 ? "Course finished! Certificate unlocked."
                 : `${nextMilestone.remainingLessons} lessons remaining to complete this course.`}
             </p>
+
             <div className="mt-2 flex items-center justify-between text-[11px] font-medium text-muted-foreground">
               <span>{nextMilestone.percent}% complete</span>
             </div>
@@ -175,6 +188,7 @@ export function LearningGoalsPanel({
                   : "Certificates Directory"}
               </span>
             </div>
+
             <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-transform group-hover:translate-x-0.5" />
           </Link>
         </div>
