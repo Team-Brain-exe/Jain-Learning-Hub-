@@ -170,6 +170,12 @@ class StorageService:
         }
 
     @staticmethod
+    def fresh_view_url(asset_id: str, storage_key: str) -> str:
+        expires_at = int(time.time()) + _get_url_expiry_seconds()
+        sig = StorageService._sign_payload(f"GET:{asset_id}:{storage_key}:{expires_at}")
+        return f"{_get_storage_base_url()}/api/uploads/storage/{asset_id}/view?" + urlencode({"expires": expires_at, "sig": sig})
+
+    @staticmethod
     def verify_signed_upload_signature(
         asset_id: str,
         storage_key: str,

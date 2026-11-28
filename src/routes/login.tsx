@@ -18,6 +18,7 @@ export const Route = createFileRoute("/login")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>) => ({ review: typeof search.review === "string" ? search.review : undefined }),
   component: Login,
 });
 
@@ -34,6 +35,7 @@ function Login() {
   const [pw, setPw] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const { review } = Route.useSearch();
   const { user } = useAuth();
   const users = usePlatform().users;
   const field = "mt-1.5 h-11 w-full rounded-md border border-border bg-card px-3 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
@@ -48,7 +50,8 @@ function Login() {
     try {
       const loggedInUser = await signIn(email.trim(), pw);
       toast.success(`Signed in as ${loggedInUser.name}`);
-      navigate({ to: homeFor(loggedInUser.role) });
+      if (review && loggedInUser.role === "reviewer") navigate({ to: "/faculty/review/$id", params: { id: review } });
+      else navigate({ to: homeFor(loggedInUser.role) });
     } catch (err: unknown) {
       const message = err instanceof ApiError ? err.message : "Failed to sign in. Please verify your credentials.";
       toast.error(message);
