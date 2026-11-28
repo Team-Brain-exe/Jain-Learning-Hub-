@@ -49,3 +49,9 @@ __pycache__/
 # Subagent-driven-development working files
 .superpowers/
 
+# Local databases and backups (never commit data)
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+backend/dev_data/
