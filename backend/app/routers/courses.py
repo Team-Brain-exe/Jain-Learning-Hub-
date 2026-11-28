@@ -2,6 +2,9 @@ import re
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
+from app.models.user import User
+from app.services.notification_service import EmailNotificationService
 from typing import List
 
 from app.database import get_db
@@ -13,6 +16,7 @@ from app.schemas.course import (
 )
 from app.schemas.ai_review import (
     CourseSubmissionResponse,
+    CourseSubmissionRequest,
     FacultyPublicationDecisionRequest,
     FacultyCourseReviewDetail,
     AIReviewJobResponse,
@@ -101,6 +105,22 @@ def create_course(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Referenced media asset must be finalized before attaching to a course."
                     )
+            # Validate asset permission and course association
+            if l_data.media_asset_id:
+                if asset.permission_id != permission.id:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Media asset permission mismatch."
+                    )
+
+                if asset.course_id is not None:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Media asset already belongs to a course."
+                    )
+
+                asset.course = course
+
             lesson = Lesson(
                 title=l_data.title,
                 content=l_data.content,
@@ -176,6 +196,7 @@ def update_course(
 @router.post("/{id}/submit", response_model=CourseSubmissionResponse)
 def submit_course_for_review(
     id: str,
+    payload: CourseSubmissionRequest = None,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(require_role("student"))
 ):
@@ -204,6 +225,46 @@ def submit_course_for_review(
         permission_id=course.permission_id
     )
 
+    # Resolve the selected faculty using the database.
+    faculty_query = db.query(User).filter(
+        User.role == "faculty",
+        User.is_active.is_(True),
+    )
+
+    if payload is not None:
+        faculty = faculty_query.filter(
+            func.lower(User.email) ==
+            payload.faculty_email.strip().lower()
+        ).first()
+    else:
+        faculty = faculty_query.filter(
+            User.id == course.faculty_reviewer_id
+        ).first()
+
+    if not faculty:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active faculty account found for this email."
+        )
+
+    if faculty.id == user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot review your own course."
+        )
+
+    student = db.query(User).filter(
+        User.id == user.id
+    ).first()
+
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Student account not found."
+        )
+
+    course.faculty_reviewer_id = faculty.id
+
     # 1. Transition to SUBMITTED -> AI_PROCESSING
     course.status = CourseLifecycleStatus.SUBMITTED
     db.commit()
@@ -211,11 +272,44 @@ def submit_course_for_review(
     # 2. Trigger AI Review Job (Prit's pipeline adapter)
     job = AIReviewService.trigger_ai_review(db=db, course=course)
 
+    db.refresh(course)
+
+    submission_message = (
+        "Course submitted. AI verification is in progress."
+    )
+
+    if course.status == CourseLifecycleStatus.FACULTY_REVIEW:
+        notification = (
+            EmailNotificationService
+            .send_faculty_course_review_notification(
+                faculty_email=faculty.email,
+                faculty_name=faculty.name,
+                student_name=student.name,
+                course_id=course.id,
+                course_title=course.title,
+                student_message=(
+                    payload.student_message or ""
+                    if payload is not None else ""
+                ),
+            )
+        )
+
+        if notification.get("status") == "SENT":
+            submission_message = (
+                "Course submitted for faculty review. "
+                "Email notification sent successfully."
+            )
+        else:
+            submission_message = (
+                "Course submitted for faculty review, "
+                "but email notification failed."
+            )
+
     return CourseSubmissionResponse(
         course_id=course.id,
         status=course.status,
         ai_job_id=job.id,
-        message="Course successfully submitted and processed by AI verification. Pending faculty review."
+        message=submission_message,
     )
 
 @router.get("/faculty/reviews", response_model=List[CourseResponse], tags=["Faculty Review"])

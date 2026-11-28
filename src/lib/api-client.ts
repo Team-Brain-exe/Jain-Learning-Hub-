@@ -337,15 +337,12 @@ export interface FacultyReviewDetail {
     id: string;
     course_id: string;
     status: string;
-    score?: number | null;
     summary?: string | null;
-    findings?: {
-      id: string;
-      severity: string;
-      category: string;
-      message: string;
-      suggestion?: string | null;
-    }[];
+    error_message?: string | null;
+    transcripts_json?: string | null;
+    total_segments?: number | null;
+    total_claims?: number | null;
+    findings?: { id: string; severity: string; finding_type: string; claim: string; explanation: string; source_location?: string | null; suggested_correction?: string | null; }[];
   } | null;
 }
 
@@ -392,10 +389,22 @@ export function submitFacultyPermissionDecision(id: string, payload: FacultyDeci
   );
 }
 
-export function submitCourseForReview(courseId: string) {
+export interface CourseSubmissionPayload {
+  faculty_name?: string;
+  faculty_email: string;
+  student_message?: string;
+}
+
+export function submitCourseForReview(
+  courseId: string,
+  payload?: CourseSubmissionPayload,
+) {
   return apiRequest<CourseSubmissionResponse>(
     `/api/courses/${encodeURIComponent(courseId)}/submit`,
-    { method: "POST" },
+    {
+      method: "POST",
+      ...(payload ? { body: JSON.stringify(payload) } : {}),
+    },
   );
 }
 
@@ -492,3 +501,139 @@ export function verifyCertificateByCode(certificateCode: string) {
     { method: "GET" },
   );
 }
+
+export interface BackendLessonCreate {
+  title: string;
+  content?: string;
+  duration_minutes: number;
+  order_index: number;
+  media_asset_id?: string;
+}
+
+export interface BackendModuleCreate {
+  title: string;
+  description?: string;
+  order_index: number;
+  lessons: BackendLessonCreate[];
+}
+
+export interface BackendCourseCreate {
+  permission_id: string;
+  title: string;
+  description?: string;
+  category: string;
+  level: string;
+  thumbnail_url?: string;
+  modules: BackendModuleCreate[];
+}
+
+export function createBackendCourse(
+  payload: BackendCourseCreate,
+) {
+  return apiRequest<BackendCourse>("/api/courses", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+
+export interface VideoUploadSession {
+  asset_id: string;
+  upload_url: string;
+  storage_key: string;
+  upload_status: string;
+  expires_in_seconds: number;
+}
+
+export interface BackendMediaAsset {
+  id: string;
+  course_id: string | null;
+  uploader_id: string;
+  permission_id: string;
+  file_name: string;
+  file_type: string;
+  mime_type: string;
+  file_size_bytes: number;
+  storage_key: string;
+  signed_url: string | null;
+  upload_status: string;
+}
+
+export async function uploadCourseVideo(
+  file: File,
+  permissionId: string,
+  courseId?: string,
+): Promise<BackendMediaAsset> {
+  const allowedTypes = [
+    "video/mp4",
+    "video/webm",
+    "video/quicktime",
+  ];
+
+  if (!allowedTypes.includes(file.type)) {
+    throw new Error("Select an MP4, WebM or MOV video.");
+  }
+
+  if (file.size === 0) {
+    throw new Error("The selected video is empty.");
+  }
+
+  if (file.size > 250 * 1024 * 1024) {
+    throw new Error("Video size must not exceed 250 MB.");
+  }
+
+  const session = await apiRequest<VideoUploadSession>(
+    "/api/uploads/request",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        permission_id: permissionId,
+        course_id: courseId,
+        file_name: file.name,
+        file_type: "video",
+        mime_type: file.type,
+        file_size_bytes: file.size,
+      }),
+    },
+  );
+
+  const uploadUrl = new URL(
+    session.upload_url,
+    API_BASE_URL + "/",
+  ).toString();
+
+  const uploadResponse = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": file.type,
+    },
+    body: file,
+  });
+
+  if (!uploadResponse.ok) {
+    throw new Error(
+      `Video upload failed (${uploadResponse.status}).`
+    );
+  }
+
+  return apiRequest<BackendMediaAsset>(
+    "/api/uploads/finalize",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        permission_id: permissionId,
+        asset_id: session.asset_id,
+      }),
+    },
+  );
+}
+
+export function fetchMediaAsset(assetId: string) {
+  return apiRequest<BackendMediaAsset>(
+    `/api/uploads/${encodeURIComponent(assetId)}`,
+    { method: "GET" },
+  );
+}
+
+
+export function resolveMediaUrl(url: string) { return new URL(url, API_BASE_URL + "/").toString(); }

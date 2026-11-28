@@ -279,4 +279,8 @@ def get_media_asset_metadata(
             detail="Access denied: You are not authorized to access this media asset.",
         )
 
+    if asset.upload_status == UploadSessionStatus.FINALIZED:
+        result = MediaAssetResponse.model_validate(asset)
+        result.signed_url = StorageService.fresh_view_url(asset.id, asset.storage_key)
+        return result
     return asset

@@ -67,3 +67,22 @@ class FacultyCourseReviewDetail(BaseModel):
     created_at: datetime
     latest_ai_job: Optional[AIReviewJobResponse]
 
+
+class CourseSubmissionRequest(BaseModel):
+    faculty_email: str = Field(
+        ...,
+        min_length=5,
+        max_length=255,
+        pattern=r"^[^\s@]+@[^\s@]+\.[^\s@]+$"
+    )
+
+    faculty_name: Optional[str] = Field(
+        None,
+        max_length=100
+    )
+
+    student_message: Optional[str] = Field(
+        None,
+        max_length=2000
+    )
+

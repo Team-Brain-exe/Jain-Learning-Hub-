@@ -77,7 +77,7 @@ export interface PlatformState {
   certificates: Certificate[]; attempts: QuizAttempt[]; policy: Policy;
 }
 
-export const DEFAULT_POLICY: Policy = { minDescriptionChars: 80, minOutcomes: 3, minLessons: 3, defaultPassMark: 70, requireQuiz: true };
+export const DEFAULT_POLICY: Policy = { minDescriptionChars: 1, minOutcomes: 1, minLessons: 1, defaultPassMark: 70, requireQuiz: false };
 export const statusLabel: Record<Status, string> = {
   draft: "Draft", submitted: "Submitted", under_review: "Under review", changes_requested: "Changes requested",
   approved: "Approved", rejected: "Rejected", published: "Published", archived: "Archived",
@@ -180,19 +180,17 @@ export function createDraft(owner: AppUser): string {
 export const updateSubmission = (id: string, patch: Partial<Submission>) => mutate((s) => patchSub(s, id, (x) => ({ ...x, ...patch })));
 export const deleteDraft = (id: string, actor: AppUser) => mutate((s) => audit({ ...s, submissions: s.submissions.filter((x) => !(x.id === id && x.status === "draft")) }, actor.name, "Deleted draft", id));
 
-export function validateForSubmit(x: Submission, p: Policy = DEFAULT_POLICY): string[] {
+export function validateForSubmit(x: Submission, _p: Policy = DEFAULT_POLICY): string[] {
   const e: string[] = [];
   if (x.title.trim().length < 5 || x.title === "Untitled course") e.push("Give the course a clear title (5+ characters).");
-  if (x.description.trim().length < p.minDescriptionChars) e.push(`Description needs at least ${p.minDescriptionChars} characters.`);
-  if (x.outcomes.filter(Boolean).length < p.minOutcomes) e.push(`Add at least ${p.minOutcomes} learning outcomes.`);
-  if (!x.prerequisites.filter(Boolean).length) e.push("List prerequisites (or write “None”).");
+  if (!x.description.trim()) e.push("Provide a course description.");
+  if (!x.outcomes.some((o) => o.trim())) e.push("Add at least one learning outcome.");
   const lessons = x.modules.flatMap((m) => m.lessons);
-  if (lessons.length < p.minLessons) e.push(`Add at least ${p.minLessons} lessons.`);
+  if (!lessons.length) e.push("Add at least one lesson.");
   x.modules.forEach((m, i) => { if (!m.title.trim()) e.push(`Module ${i + 1} needs a title.`); if (!m.lessons.length) e.push(`Module “${m.title || i + 1}” has no lessons.`); });
   lessons.forEach((l) => { if (!l.title.trim()) e.push("Every lesson needs a title."); if (l.kind === "video" && !l.videoUrl.trim()) e.push(`Lesson “${l.title}” needs a video URL.`); });
-  if (p.requireQuiz) {
-    if (!x.quiz || !x.quiz.questions.length) e.push("Add at least one quiz question.");
-    else x.quiz.questions.forEach((q, i) => {
+  if (x.quiz?.questions.length) {
+    x.quiz.questions.forEach((q, i) => {
       if (!q.prompt.trim()) e.push(`Quiz question ${i + 1} has no text.`);
       if (q.options.filter((o) => o.trim()).length < 2) e.push(`Quiz question ${i + 1} needs at least two options.`);
       if (!q.options[q.correct]?.trim()) e.push(`Quiz question ${i + 1}: the correct answer is blank.`);

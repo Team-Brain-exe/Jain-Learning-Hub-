@@ -1,104 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Bot } from "lucide-react";
-import { reviewDecision, setAiReport, usePlatform } from "@/data/platform";
-import { runAiCheck } from "@/lib/ai-check";
 import { useAuth } from "@/hooks/use-auth";
-import { AiReportView } from "@/components/studio/AiReportView";
-import { btn, btnOutline, card, Empty, fmtDateTime, input, RequireRole, StatusBadge } from "@/components/studio/ui";
-
-export const Route = createFileRoute("/faculty/review/$id")({
-  head: () => ({ meta: [{ title: "Review course — JAIN FET Learning Hub" }, { name: "robots", content: "noindex" }] }),
-  component: () => <RequireRole roles={["reviewer", "admin"]}><Review /></RequireRole>,
-});
-
-function Review() {
-  const { id } = Route.useParams();
-  const { user } = useAuth();
-  const sub = usePlatform().submissions.find((s) => s.id === id);
-  const [text, setText] = useState("");
-  if (!sub) return <div className="mx-auto max-w-xl px-4 py-16"><Empty title="Submission not found"><Link to="/faculty" className={btn}>Back to queue</Link></Empty></div>;
-
-  const isOwn = sub.ownerId === user!.id;
-  const assigned = user!.role === "admin" || sub.reviewerId === user!.id;
-  const canDecide = sub.status === "under_review" && assigned && !isOwn;
-  const decide = (d: "approve" | "reject" | "changes") => {
-    const err = reviewDecision(sub.id, d, text, user!);
-    if (err) return void toast.error(err);
-    toast.success("Decision recorded");
-    setText("");
-  };
-
-  return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <Link to="/faculty" className="inline-flex min-h-10 items-center text-sm font-semibold text-primary">← Review queue</Link>
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-extrabold tracking-tight">{sub.title}</h1><StatusBadge status={sub.status} />
-      </div>
-      <p className="mt-1 text-sm text-muted-foreground">By {sub.ownerName} ({sub.ownerType}) · {sub.category} · {sub.level} · {sub.weeks} weeks · v{sub.version}</p>
-
-      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_340px]">
-        <div className="space-y-8">
-          <section className={card}>
-            <h2 className="font-bold">Description</h2><p className="mt-2 text-sm">{sub.description}</p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div><h3 className="text-sm font-semibold">Outcomes</h3><ul className="mt-1 list-disc pl-5 text-sm">{sub.outcomes.filter(Boolean).map((o) => <li key={o}>{o}</li>)}</ul></div>
-              <div><h3 className="text-sm font-semibold">Prerequisites</h3><ul className="mt-1 list-disc pl-5 text-sm">{sub.prerequisites.filter(Boolean).map((o) => <li key={o}>{o}</li>)}</ul></div>
-            </div>
-          </section>
-          <section>
-            <h2 className="font-bold">Modules & lessons</h2>
-            <div className="mt-3 space-y-4">
-              {sub.modules.map((m) => (
-                <div key={m.id} className="rounded-xl border border-border bg-card">
-                  <p className="border-b border-border bg-secondary px-4 py-2 font-semibold">{m.title}</p>
-                  <ul className="divide-y divide-border">
-                    {m.lessons.map((l) => (
-                      <li key={l.id} className="space-y-1 px-4 py-3 text-sm">
-                        <p className="font-semibold">{l.title} <span className="font-normal text-muted-foreground">· {l.minutes} min · {l.kind}</span></p>
-                        {l.description && <p>{l.description}</p>}
-                        {l.videoUrl && <a href={l.videoUrl} target="_blank" rel="noreferrer noopener" className="block text-primary underline">Open video</a>}
-                        {l.resources.map((r) => <a key={r.url} href={r.url} target="_blank" rel="noreferrer noopener" className="block text-primary underline">{r.title || r.url}</a>)}
-                        {l.transcript && <details><summary className="cursor-pointer text-xs font-semibold text-muted-foreground">Transcript</summary><pre className="mt-1 whitespace-pre-wrap text-xs">{l.transcript}</pre></details>}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </section>
-          {sub.quiz && (
-            <section className={card}><h2 className="font-bold">Assessment ({sub.quiz.questions.length} questions · pass {sub.quiz.passMark}%)</h2>
-              <ol className="mt-3 list-decimal space-y-3 pl-5 text-sm">{sub.quiz.questions.map((q) => <li key={q.id}>{q.prompt}<ul className="mt-1 list-disc pl-5 text-muted-foreground">{q.options.filter(Boolean).map((o, i) => <li key={i} className={i === q.correct ? "font-semibold text-success" : ""}>{o}{i === q.correct && " ✓"}</li>)}</ul></li>)}</ol>
-            </section>
-          )}
-          <section>
-            <div className="flex items-center justify-between"><h2 className="font-bold">AI report</h2><button className={btnOutline} onClick={() => setAiReport(sub.id, runAiCheck(sub))}><Bot className="h-4 w-4" />{sub.aiReport ? "Re-run" : "Run check"}</button></div>
-            <div className="mt-3"><AiReportView sub={sub} actor={user} canOverride={canDecide} /></div>
-          </section>
-        </div>
-
-        <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-          <div className={card}>
-            <h2 className="font-bold">Decision</h2>
-            {isOwn && <p className="mt-2 text-sm text-destructive">You cannot review your own course.</p>}
-            {!isOwn && !assigned && <p className="mt-2 text-sm text-muted-foreground">This course is not assigned to you.</p>}
-            {!isOwn && assigned && sub.status !== "under_review" && <p className="mt-2 text-sm text-muted-foreground">Decisions are only possible while a course is under review.</p>}
-            <label className="mt-3 block text-sm font-semibold">Feedback to creator<textarea rows={5} className={input} value={text} onChange={(e) => setText(e.target.value)} disabled={!canDecide} placeholder="Required for “Request changes” and “Reject”." /></label>
-            <div className="mt-3 grid gap-2">
-              <button className={btn} disabled={!canDecide} onClick={() => decide("approve")}>Approve</button>
-              <button className={btnOutline} disabled={!canDecide} onClick={() => decide("changes")}>Request changes</button>
-              <button className="inline-flex h-10 items-center justify-center rounded-md border border-destructive px-5 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50" disabled={!canDecide} onClick={() => confirm("Reject this course?") && decide("reject")}>Reject</button>
-            </div>
-            <p className="mt-3 text-xs text-muted-foreground">Approval does not publish — an administrator publishes approved courses.</p>
-          </div>
-          <div className={card}>
-            <h3 className="font-bold">Activity</h3>
-            <ol className="mt-3 space-y-3 text-sm">{[...sub.feedback].reverse().map((f) => <li key={f.id}><p className="text-xs text-muted-foreground">{fmtDateTime(f.at)} · {f.by}</p><p>{f.text}</p></li>)}</ol>
-          </div>
-        </aside>
-      </div>
-    </div>
-  );
-}
+import { fetchCourseById, fetchFacultyCourseReviewDetail, fetchMediaAsset, submitFacultyPublicationDecision, resolveMediaUrl, type BackendCourse, type FacultyReviewDetail, type FacultyPublicationDecisionPayload } from "@/lib/api-client";
+import { btn, btnOutline, card, Empty, input, RequireRole } from "@/components/studio/ui";
+export const Route = createFileRoute("/faculty/review/$id")({component: Gate});
+function Gate(){const {user}=useAuth();const {id}=Route.useParams();if(!user)return <div className="mx-auto max-w-xl px-4 py-16"><Empty title="Faculty sign in required"><Link to="/login" search={{review:id}} className={btn}>Sign in</Link></Empty></div>;return <RequireRole roles={["reviewer"]}><Review key={id+":"+user.id}/></RequireRole>}
+function Video({id}:{id:string}){const [url,setUrl]=useState("");const [error,setError]=useState("");const [busy,setBusy]=useState(false);async function load(){setBusy(true);setError("");setUrl("");try{const a=await fetchMediaAsset(id);if(!a.signed_url||a.upload_status.toUpperCase()!=="FINALIZED")throw new Error("Video is not available");setUrl(resolveMediaUrl(a.signed_url))}catch(e){setError(e instanceof Error?e.message:"Video unavailable")}finally{setBusy(false)}}return <div className="mt-2"><button className={btnOutline} disabled={busy} onClick={load}>{busy?"Loading…":url?"Refresh video link":"Load video"}</button>{error&&<p role="alert">{error}</p>}{url&&<video className="mt-2 w-full rounded-lg" controls preload="metadata" src={url} onError={()=>setError("Playback failed. Refresh the video link or check storage.")}/>}</div>}
+function Review(){const {id}=Route.useParams();const [course,setCourse]=useState<BackendCourse|null>(null);const [detail,setDetail]=useState<FacultyReviewDetail|null>(null);const [error,setError]=useState("");const [remarks,setRemarks]=useState("");const [busy,setBusy]=useState(false);const [retry,setRetry]=useState(0);
+useEffect(()=>{let active=true;setError("");setCourse(null);setDetail(null);Promise.all([fetchCourseById(id),fetchFacultyCourseReviewDetail(id)]).then(([c,d])=>{if(active){setCourse(c);setDetail(d)}}).catch(e=>{if(active)setError(e instanceof Error?e.message:"Unable to load course")});return()=>{active=false}},[id,retry]);
+const job=detail?.latest_ai_job;const pending=!!course&&course.status.toUpperCase()==="FACULTY_REVIEW";const aiActive=!!job&&["QUEUED","PROCESSING","EXTRACTING","VERIFYING"].includes(job.status.toUpperCase());
+async function decide(decision:FacultyPublicationDecisionPayload["decision"]){if(!pending||busy||aiActive)return;if(decision!=="APPROVE"&&!remarks.trim()){toast.error("Enter feedback first.");return}if(decision==="APPROVE"&&!confirm("Approve and publish this course? Confirm that you have manually reviewed its content."))return;setBusy(true);try{const updated=await submitFacultyPublicationDecision(id,{decision,remarks:remarks.trim()});setCourse(updated);toast.success("Decision saved")}catch(e){toast.error(e instanceof Error?e.message:"Decision failed")}finally{setBusy(false)}}
+return <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6"><Link to="/faculty" className="text-primary font-semibold">← Review queue</Link>{error?<Empty title="Unable to load course" body={error}><button className={btnOutline} onClick={()=>setRetry(v=>v+1)}>Retry</button></Empty>:!course||!detail?<p>Loading course…</p>:<><h1 className="mt-3 text-2xl font-extrabold">{course.title}</h1><p className="text-sm text-muted-foreground">{course.category} · {course.level} · {course.status.replace(/_/g," ")}</p><div className="mt-8 grid gap-8 lg:grid-cols-[1fr_340px]"><div className="space-y-6"><section className={card}><h2 className="font-bold">Description</h2><p className="mt-2 whitespace-pre-wrap text-sm">{course.description}</p></section><section className="space-y-3"><h2 className="font-bold">Modules & lessons</h2>{course.modules.map(m=><div key={m.id} className={card}><h3 className="font-semibold">{m.title}</h3><p>{m.description}</p>{m.lessons.map(l=><div key={l.id} className="mt-3 border-t pt-3"><p className="font-semibold">{l.title} · {l.duration_minutes} min</p><p className="whitespace-pre-wrap text-sm">{l.content}</p>{l.media_asset_id&&<Video id={l.media_asset_id}/>}</div>)}</div>)}</section><section className={card}><h2 className="font-bold">AI verification report</h2><p className="mt-2 text-sm">AI findings are advisory. Verify content manually, including any unprocessed video.</p>{!job?<p>No AI report available.</p>:<><p className="mt-2 font-semibold">Status: {job.status}</p><p className="whitespace-pre-wrap">{job.summary}</p>{job.error_message&&<p className="text-destructive">{job.error_message}</p>}<p className="text-sm">Segments: {job.total_segments??0} · Claims: {job.total_claims??0}</p>{job.findings?.map(f=><article key={f.id} className="mt-3 rounded-lg border p-3 text-sm"><p className="font-semibold">{f.severity} · {f.finding_type}</p><p>{f.claim}</p><p>{f.explanation}</p>{f.source_location&&<p>Source: {f.source_location}</p>}{f.suggested_correction&&<p>Suggested correction: {f.suggested_correction}</p>}</article>)}{job.transcripts_json&&<details className="mt-3"><summary>Extracted transcript data</summary><pre className="whitespace-pre-wrap break-all text-xs">{job.transcripts_json}</pre></details>}</>}</section></div><aside className={card+" self-start"}><h2 className="font-bold">Publication decision</h2><p className="text-sm mt-2">Approval publishes the course. Review all materials before deciding.</p>{course.review_remarks&&<p className="mt-2 text-sm">Previous feedback: {course.review_remarks}</p>}<label className="mt-3 block text-sm font-semibold">Feedback<textarea className={input} rows={5} maxLength={2000} value={remarks} onChange={e=>setRemarks(e.target.value)} disabled={!pending||busy}/></label><div className="mt-3 grid gap-2"><button className={btn} disabled={!pending||busy||aiActive} onClick={()=>decide("APPROVE")}>Approve & publish</button><button className={btnOutline} disabled={!pending||busy||aiActive} onClick={()=>decide("REQUEST_REVISION")}>Request changes</button><button className={btnOutline} disabled={!pending||busy||aiActive} onClick={()=>decide("REJECT")}>Reject</button><button className={btnOutline} disabled={busy} onClick={()=>setRetry(v=>v+1)}>Refresh status</button></div></aside></div></>}</div>}
